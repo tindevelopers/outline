@@ -49,6 +49,7 @@ const Shares = lazy(() => import("~/scenes/Settings/Shares"));
 const Templates = lazy(() => import("~/scenes/Settings/Templates"));
 const CustomEmojis = lazy(() => import("~/scenes/Settings/CustomEmojis"));
 const Embeds = lazy(() => import("~/scenes/Settings/Embeds"));
+const Ops = lazy(() => import("~/scenes/Settings/Ops"));
 
 export type ConfigItem = {
   name: string;
@@ -255,6 +256,16 @@ const useSettingsConfig = () => {
         enabled: can.update,
         group: t("Integrations"),
         icon: PlusIcon,
+      },
+      // Platform console – visible only to platform administrators.
+      {
+        name: t("Platform"),
+        path: settingsPath("ops"),
+        component: Ops.Component,
+        preload: Ops.preload,
+        enabled: Boolean(user.isPlatformAdmin),
+        group: t("Platform"),
+        icon: ShieldIcon,
       },
     ];
 

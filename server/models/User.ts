@@ -85,6 +85,8 @@ export enum UserFlag {
   MobileWeb = "mobileWeb",
   MCP = "mcp",
   AvatarUpdated = "avatarUpdated",
+  /** Grants platform-level (ops console) access across all tenants. */
+  PlatformAdmin = "platformAdmin",
 }
 
 @Scopes(() => ({
@@ -308,6 +310,13 @@ class User extends ParanoidModel<
    */
   get isGuest() {
     return this.role === UserRole.Guest;
+  }
+  /**
+   * Whether the user has platform-wide access, granting the ability to manage
+   * all tenants through the ops console. Independent of team role.
+   */
+  get isPlatformAdmin() {
+    return this.getFlag(UserFlag.PlatformAdmin) > 0;
   }
 
   get color() {

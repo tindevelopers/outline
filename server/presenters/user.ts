@@ -24,6 +24,7 @@ type UserPresentation = {
   color: string;
   role: UserRole;
   isSuspended: boolean;
+  isPlatformAdmin?: boolean;
   email?: string | null;
   language?: string;
   preferences?: UserPreferences | null;
@@ -64,6 +65,12 @@ export default function presentUser(
 
   if (options.includeEmail) {
     userData.email = user.email;
+  }
+
+  // Only include the flag for platform admins to avoid exposing internal
+  // authorization state to the broader user base.
+  if (user.isPlatformAdmin) {
+    userData.isPlatformAdmin = true;
   }
 
   // Only included when the association has been eager-loaded by the caller.

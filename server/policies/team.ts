@@ -58,3 +58,15 @@ allow(User, ["createTemplate", "updateTemplate"], Team, (actor, team) =>
     isTeamMutable(actor)
   )
 );
+
+// Platform-wide ops console access: only a user explicitly flagged as a
+// Platform Admin may manage tenants across all companies. This is scoped to
+// the actor's own team model for the boundary check but the capability itself
+// is global (independent of the target tenant).
+allow(User, "manageOps", Team, (actor, team) =>
+  and(
+    //
+    actor.isPlatformAdmin,
+    isTeamModel(actor, team)
+  )
+);

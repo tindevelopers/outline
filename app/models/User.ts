@@ -89,6 +89,9 @@ class User extends ParanoidModel implements Searchable {
   isSuspended: boolean;
 
   @observable
+  isPlatformAdmin: boolean | undefined = undefined;
+
+  @observable
   invitedById: string | undefined = undefined;
 
   /** The user that invited this user, if they were invited. */
