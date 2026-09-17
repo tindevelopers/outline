@@ -27,3 +27,13 @@ fi
 chmod 600 /root/.ssh/authorized_keys
 
 echo OK
+echo
+echo "=== authorized_keys ==="
+cat /root/.ssh/authorized_keys
+echo "=== perms ==="
+ls -la /root/.ssh
+echo "=== sshd root/pubkey config ==="
+grep -riE 'PermitRootLogin|PubkeyAuthentication|AuthorizedKeysFile|PasswordAuthentication' /etc/ssh/sshd_config /etc/ssh/sshd_config.d 2>/dev/null | grep -v '^#' | head -20
+echo "=== sshd effective for root ==="
+sshd -T -C user=root 2>/dev/null | grep -iE '^permitrootlogin|^pubkeyauthentication|^authorizedkeysfile|^passwordauthentication' | head -10
+echo "=== END ==="
