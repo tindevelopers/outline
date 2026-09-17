@@ -281,7 +281,11 @@ class Team extends ParanoidModel<
       return `${url.protocol}//${this.domain}${url.port ? `:${url.port}` : ""}`;
     }
 
-    if (!this.subdomain || !env.isCloudHosted) {
+    // Per-tenant subdomain routing. This is enabled for self-hosted installs
+    // too when a team has a subdomain (e.g. `tin.localhost:3000` locally,
+    // `<tenant>.example.com` in production). Teams without a subdomain fall
+    // back to the base `env.URL`.
+    if (!this.subdomain) {
       return env.URL;
     }
 

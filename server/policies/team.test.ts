@@ -13,7 +13,9 @@ describe("policies/team", () => {
     });
     const abilities = serialize(user, team);
     expect(abilities.read).toBeTruthy();
-    expect(abilities.createTeam).toEqual(false);
+    // PoC-1: self-hosted members may create teams, subject to the
+    // team's `memberTeamCreate` preference (default: enabled).
+    expect(abilities.createTeam).toEqual(true);
     expect(abilities.createAttachment).toBeTruthy();
     expect(abilities.createCollection).toBeTruthy();
     expect(abilities.createTemplate).toEqual(false);
@@ -30,7 +32,8 @@ describe("policies/team", () => {
     });
     const abilities = serialize(admin, team);
     expect(abilities.read).toBeTruthy();
-    expect(abilities.createTeam).toEqual(false);
+    // PoC-1: self-hosted admins can create teams (isCloudHosted gate removed).
+    expect(abilities.createTeam).toEqual(true);
     expect(abilities.createAttachment).toBeTruthy();
     expect(abilities.createCollection).toBeTruthy();
     expect(abilities.createTemplate).toBeTruthy();

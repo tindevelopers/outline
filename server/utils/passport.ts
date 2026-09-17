@@ -358,7 +358,26 @@ export async function getTeamFromContext(
   const domain = parseDomain(host);
 
   let team;
-  if (!env.isCloudHosted) {
+
+  // Resolve by OAuth root share first (public share context)
+  if (context.state?.rootShare) {
+    team = await Team.findByPk(context.state.rootShare.teamId);
+  }
+  // Resolve by custom domain
+  else if (domain.custom) {
+    team = await Team.findByDomain(domain.host);
+  }
+  // Resolve by tenant subdomain — enabled for self-hosted installs so that
+  // per-tenant subdomain routing works (e.g. `tin.localhost:3000` locally).
+  // This makes the workspace switcher and per-company tenants functional
+  // outside the cloud host.
+  else if (domain.teamSubdomain) {
+    team = await Team.findBySubdomain(domain.teamSubdomain);
+  }
+
+  // Fallback for single-team / unsubdomained self-hosted installs: the previous
+  // behaviour of routing everything to the latest (only) team is preserved.
+  if (!team && !env.isCloudHosted) {
     if (env.ENVIRONMENT === "test") {
       team = await Team.findByDomain(env.URL);
     } else {
@@ -366,12 +385,6 @@ export async function getTeamFromContext(
         order: [["createdAt", "DESC"]],
       });
     }
-  } else if (context.state?.rootShare) {
-    team = await Team.findByPk(context.state.rootShare.teamId);
-  } else if (domain.custom) {
-    team = await Team.findByDomain(domain.host);
-  } else if (domain.teamSubdomain) {
-    team = await Team.findBySubdomain(domain.teamSubdomain);
   }
 
   return team;

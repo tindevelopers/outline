@@ -247,7 +247,6 @@ export default class AuthStore extends Store<Team> {
             return;
           }
         } else if (
-          isCloudHosted &&
           parseDomain(hostname).teamSubdomain !== (data.team.subdomain ?? "")
         ) {
           window.location.href = `${data.team.url}${pathname}`;

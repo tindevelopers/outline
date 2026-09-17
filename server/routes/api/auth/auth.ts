@@ -27,31 +27,6 @@ import type * as T from "./schema";
 const router = new Router();
 
 router.post("auth.config", async (ctx: APIContext<T.AuthConfigReq>) => {
-  // If self hosted AND there is only one team then that team becomes the
-  // brand for the knowledge base and it's guest signin option is used for the
-  // root login page.
-  if (!env.isCloudHosted) {
-    const team = await Team.scope("withAuthenticationProviders").findOne({
-      order: [["createdAt", "DESC"]],
-    });
-
-    if (team) {
-      ctx.body = {
-        data: {
-          name: team.name,
-          customTheme: team.getPreference(TeamPreference.CustomTheme),
-          logo: team.getPreference(TeamPreference.PublicBranding)
-            ? team.avatarUrl
-            : undefined,
-          providers: (await AuthenticationHelper.providersForTeam(team)).map(
-            presentProviderConfig
-          ),
-        },
-      };
-      return;
-    }
-  }
-
   const domain = parseDomain(ctx.request.hostname);
 
   if (domain.custom) {
@@ -81,7 +56,9 @@ router.post("auth.config", async (ctx: APIContext<T.AuthConfigReq>) => {
 
   // If subdomain signin page then we return minimal team details to allow
   // for a custom screen showing only relevant signin options for that team.
-  else if (env.isCloudHosted && domain.teamSubdomain) {
+  // Enabled for self-hosted installs so per-tenant subdomains work
+  // (e.g. `tin.localhost:3000` locally).
+  if (domain.teamSubdomain) {
     const team = await Team.scope("withAuthenticationProviders").findOne({
       where: {
         subdomain: domain.teamSubdomain,
@@ -97,6 +74,31 @@ router.post("auth.config", async (ctx: APIContext<T.AuthConfigReq>) => {
             ? team.avatarUrl
             : undefined,
           hostname: ctx.request.hostname,
+          providers: (await AuthenticationHelper.providersForTeam(team)).map(
+            presentProviderConfig
+          ),
+        },
+      };
+      return;
+    }
+  }
+
+  // Fallback for single-team / unsubdomained self-hosted installs: if the
+  // request host is the apex and isn't a custom or tenant subdomain, the
+  // latest (only) team becomes the brand for the root signin page.
+  if (!env.isCloudHosted) {
+    const team = await Team.scope("withAuthenticationProviders").findOne({
+      order: [["createdAt", "DESC"]],
+    });
+
+    if (team) {
+      ctx.body = {
+        data: {
+          name: team.name,
+          customTheme: team.getPreference(TeamPreference.CustomTheme),
+          logo: team.getPreference(TeamPreference.PublicBranding)
+            ? team.avatarUrl
+            : undefined,
           providers: (await AuthenticationHelper.providersForTeam(team)).map(
             presentProviderConfig
           ),

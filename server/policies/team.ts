@@ -29,10 +29,11 @@ allow(User, "share", Team, (actor, team) =>
   )
 );
 
+// PoC-1: `isCloudHosted()` removed so self-hosted instances can create
+// additional workspaces (teams). Team acts as the tenant boundary.
 allow(User, "createTeam", Team, (actor, team) =>
   and(
     //
-    isCloudHosted(),
     !actor.isGuest,
     !actor.isViewer,
     or(actor.isAdmin, !!team?.memberTeamCreate)
