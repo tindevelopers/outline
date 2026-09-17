@@ -148,6 +148,35 @@ export async function getUserForEmailSigninToken(
 }
 
 /**
+ * Retrieves the user associated with an invite acceptance token, validating
+ * the token's type and expiration. Unlike the email signin token it is not
+ * bound to an IP address, so the invitee can open it from any device.
+ *
+ * @param token the invite acceptance token to validate.
+ * @returns the user associated with the token.
+ * @throws AuthenticationError if the token is invalid or expired.
+ */
+export async function getUserForInviteToken(token: string): Promise<User> {
+  const payload = getJWTPayload(token);
+
+  if (payload.type !== "invite-accept") {
+    throw AuthenticationError("Invalid token");
+  }
+
+  const user = await User.scope("withTeam").findByPk(payload.id, {
+    rejectOnEmpty: true,
+  });
+
+  try {
+    JWT.verify(token, user.jwtSecret);
+  } catch (_err) {
+    throw AuthenticationError("Invalid token");
+  }
+
+  return user;
+}
+
+/**
  * Retrieves the user and new email address associated with an email update
  * token, validating the token's type and expiration.
  *

@@ -700,6 +700,24 @@ class User extends ParanoidModel<
     );
 
   /**
+   * Returns a long-lived token that accepts an email invitation with a single
+   * click. Unlike the email signin token it is not IP-bound, and it is only
+   * honored while the invite has not yet been accepted.
+   *
+   * @returns The invite acceptance token
+   */
+  getInviteToken = () =>
+    JWT.sign(
+      {
+        id: this.id,
+        createdAt: new Date().toISOString(),
+        type: "invite-accept",
+      },
+      this.jwtSecret,
+      { expiresIn: "30d" }
+    );
+
+  /**
    * Generate a 6-digit verification code for email authentication
    * and store it in Redis with a 10-minute TTL.
    *

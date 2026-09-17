@@ -16,7 +16,11 @@ import { RateLimiterStrategy } from "@server/utils/RateLimiter";
 import { VerificationCode } from "@server/utils/VerificationCode";
 import { signIn } from "@server/utils/authentication";
 import { getTokenFromCookie } from "@server/utils/csrf";
-import { getUserForEmailSigninToken } from "@server/utils/jwt";
+import {
+  getJWTPayload,
+  getUserForEmailSigninToken,
+  getUserForInviteToken,
+} from "@server/utils/jwt";
 import { getTeamFromContext } from "@server/utils/passport";
 import * as T from "./schema";
 import { CSRF } from "@shared/constants";
@@ -33,7 +37,13 @@ router.post(
     const domain = parseDomain(ctx.request.hostname);
 
     let team: Team | null | undefined;
-    if (!env.isCloudHosted) {
+    if (!env.isCloudHosted && domain.teamSubdomain) {
+      // Multi-tenant self-hosted: resolve by subdomain so each workspace's
+      // login page authenticates against the correct team.
+      team = await Team.scope("withAuthenticationProviders").findOne({
+        where: { subdomain: domain.teamSubdomain },
+      });
+    } else if (!env.isCloudHosted) {
       team = await Team.scope("withAuthenticationProviders").findOne();
     } else if (domain.custom) {
       team = await Team.scope("withAuthenticationProviders").findOne({
@@ -135,7 +145,12 @@ const emailCallback = async (ctx: APIContext<T.EmailCallbackReq>) => {
 
   try {
     if (token) {
-      user = await getUserForEmailSigninToken(ctx, token as string);
+      // Both magic sign-in tokens and one-click invite acceptance tokens
+      // arrive here; they are distinguished by the type claim in the JWT.
+      user =
+        getJWTPayload(token as string).type === "invite-accept"
+          ? await getUserForInviteToken(token as string)
+          : await getUserForEmailSigninToken(ctx, token as string);
     } else if (code && email) {
       const team = await getTeamFromContext(ctx);
 

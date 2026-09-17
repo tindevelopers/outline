@@ -13,6 +13,8 @@ export type Invite = {
   name: string;
   email: string;
   role: UserRole;
+  /** Grants platform admin. Honored only when the inviter is a platform admin. */
+  platformAdmin?: boolean;
 };
 
 type Props = {
@@ -71,14 +73,19 @@ export default async function userInviter(
 
   // send and record remaining invites
   for (const invite of filteredInvites) {
+    // Platform admin can only be granted by an existing platform admin. It
+    // outranks workspace roles, so such accounts are provisioned as Admin.
+    const grantPlatformAdmin = !!invite.platformAdmin && user.isPlatformAdmin;
+
     const newUser = await User.createWithCtx(
       ctx,
       {
         teamId: user.teamId,
         name: invite.name,
         email: invite.email,
-        role:
-          user.isAdmin && invite.role === UserRole.Admin
+        role: grantPlatformAdmin
+          ? UserRole.Admin
+          : user.isAdmin && invite.role === UserRole.Admin
             ? UserRole.Admin
             : user.isViewer || invite.role === UserRole.Viewer
               ? UserRole.Viewer
@@ -94,6 +101,12 @@ export default async function userInviter(
         name: "invite",
       }
     );
+
+    if (grantPlatformAdmin) {
+      newUser.setFlag(UserFlag.PlatformAdmin, true);
+      await newUser.saveWithCtx(ctx);
+    }
+
     users.push(newUser);
 
     if (!suppressEmail) {
@@ -105,6 +118,7 @@ export default async function userInviter(
         actorEmail: user.email,
         teamName: team.name,
         teamUrl: team.url,
+        token: newUser.getInviteToken(),
       }).schedule();
     }
 

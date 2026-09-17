@@ -17,6 +17,8 @@ type Props = EmailProps & {
   actorEmail: string | null;
   teamName: string;
   teamUrl: string;
+  /** Optional one-click acceptance token; turns "Join now" into a sign-in link. */
+  token?: string;
 };
 
 /**
@@ -60,18 +62,25 @@ export default class InviteEmail extends BaseEmail<Props, void> {
     actorName,
     actorEmail,
     teamUrl,
+    token,
   }: Props): string {
+    const inviteLink = token
+      ? `${teamUrl}/auth/email.callback?token=${token}`
+      : teamUrl;
+
     return `
 ${this.t("Join {{ teamName }} on {{ appName }}", { teamName, appName: env.APP_NAME })}
 
 ${actorName} ${actorEmail ? `(${actorEmail})` : ""} ${this.t("has invited you to join {{ appName }}, a place for your team to build and share knowledge.", { appName: env.APP_NAME })}
 
-${this.t("Join now")}: ${teamUrl}
+${this.t("Join now")}: ${inviteLink}
 `;
   }
 
-  protected render({ teamName, actorName, actorEmail, teamUrl }: Props) {
-    const inviteLink = `${teamUrl}?ref=invite-email`;
+  protected render({ teamName, actorName, actorEmail, teamUrl, token }: Props) {
+    const inviteLink = token
+      ? `${teamUrl}/auth/email.callback?token=${token}`
+      : `${teamUrl}?ref=invite-email`;
 
     return (
       <EmailTemplate previewText={this.preview()}>

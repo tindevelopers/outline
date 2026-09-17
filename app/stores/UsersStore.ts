@@ -95,6 +95,7 @@ export default class UsersStore extends Store<User> {
       email: string;
       name: string;
       role: UserRole;
+      platformAdmin?: boolean;
     }[]
   ): Promise<User[]> => {
     const res = await client.post(`/users.invite`, {

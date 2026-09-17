@@ -2,6 +2,7 @@ import {
   DoneIcon,
   EmailIcon,
   PlusIcon,
+  ShieldIcon,
   TrashIcon,
   UserRemoveIcon,
 } from "outline-icons";
@@ -10,6 +11,7 @@ import { UserRole } from "@shared/types";
 import { UserRoleHelper } from "@shared/utils/UserRoleHelper";
 import stores from "~/stores";
 import User from "~/models/User";
+import { client } from "~/utils/ApiClient";
 import Invite from "~/scenes/Invite";
 import {
   UserChangeAvatarDialog,
@@ -270,6 +272,59 @@ export const deleteUser = dialogActionFactory({
       User,
       (user) => context.stores.policies.abilities(user.id).delete
     ),
+});
+
+/**
+ * Grants or revokes the platform admin flag for a single user.
+ * Only visible to the current platform admin.
+ */
+export const togglePlatformAdmin = createAction({
+  name: ({ t, getActiveModels }) => {
+    const users = getActiveModels(User);
+    const target = users.length === 1 ? users[0] : undefined;
+    return target?.isPlatformAdmin
+      ? t("Revoke Platform Admin")
+      : t("Grant Platform Admin");
+  },
+  analyticsName: "Toggle platform admin",
+  section: UserSection,
+  icon: <ShieldIcon />,
+  visible: (context) => {
+    // Only show if the current logged-in user is a platform admin
+    if (!stores.auth.user?.isPlatformAdmin) {
+      return false;
+    }
+    const users = context.getActiveModels(User);
+    // Only works on a single user at a time, not yourself
+    if (users.length !== 1) {
+      return false;
+    }
+    return users[0].id !== stores.auth.user?.id;
+  },
+  perform: async ({ t, getActiveModels }) => {
+    const users = getActiveModels(User);
+    const target = users.length === 1 ? users[0] : undefined;
+    if (!target) {
+      return;
+    }
+    const next = !target.isPlatformAdmin;
+    try {
+      await client.post("/ops.users.setPlatformAdmin", {
+        userId: target.id,
+        platformAdmin: next,
+      });
+      target.isPlatformAdmin = next;
+      // Platform Admin outranks workspace roles: the server ensures Admin.
+      if (next) {
+        target.role = UserRole.Admin;
+      }
+      toast.success(
+        next ? t("Platform admin granted") : t("Platform admin revoked")
+      );
+    } catch {
+      toast.error(t("Could not update platform admin"));
+    }
+  },
 });
 
 export const rootUserActions = [inviteUser];

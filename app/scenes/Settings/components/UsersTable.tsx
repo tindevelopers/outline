@@ -164,7 +164,11 @@ export function UsersTable({ canManage, ...rest }: Props) {
           component: (user) => (
             <HStack spacing={4} wrap>
               {user.isInvited && <Badge>{t("Invited")}</Badge>}
-              {user.isAdmin ? (
+              {/* Platform Admin is an exclusive role — it replaces the
+                  workspace role badge rather than stacking on top of it. */}
+              {user.isPlatformAdmin ? (
+                <Badge yellow>{t("Platform Admin")}</Badge>
+              ) : user.isAdmin ? (
                 <Badge primary>{t("Admin")}</Badge>
               ) : user.isViewer ? (
                 <Badge>{t("Viewer")}</Badge>

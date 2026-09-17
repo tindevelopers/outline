@@ -388,6 +388,11 @@ async function updateRole(ctx: APIContext<T.UsersChangeRoleReq>) {
   if (user.id === actor.id) {
     throw ValidationError("You cannot change your own role");
   }
+  if (user.isPlatformAdmin) {
+    throw ValidationError(
+      "Platform admins hold an exclusive role; revoke platform admin from the platform console first"
+    );
+  }
 
   if (UserRoleHelper.canDemote(user, role)) {
     name = "demote";
@@ -542,6 +547,7 @@ router.post(
       actorEmail: actor.email,
       teamName: actor.team.name,
       teamUrl: actor.team.url,
+      token: user.getInviteToken(),
     }).schedule();
 
     user.incrementFlag(UserFlag.InviteSent);

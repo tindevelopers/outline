@@ -222,6 +222,8 @@ export const UsersInviteSchema = z.object({
         email: z.email(),
         name: z.string(),
         role: z.enum(UserRole),
+        /** Grants platform admin. Honored only when the inviter is one. */
+        platformAdmin: z.boolean().optional(),
       })
     ),
     suppressEmail: z.boolean().optional(),

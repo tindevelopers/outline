@@ -46,7 +46,11 @@ function Invite({ onSubmit }: Props) {
   const { t } = useTranslation();
   const predictedDomain = parseEmail(user.email).domain;
   const can = usePolicy(team);
-  const [role, setRole] = React.useState<UserRole>(UserRole.Member);
+  // The dropdown value is a UserRole, plus a sentinel "platformAdmin" that maps
+  // to a Viewer role with the platform admin flag set on creation.
+  const [role, setRole] = React.useState<UserRole | "platformAdmin">(
+    UserRole.Member
+  );
 
   const handleSubmit = React.useCallback(
     async (ev: React.SyntheticEvent) => {
@@ -54,8 +58,15 @@ function Invite({ onSubmit }: Props) {
       setIsSaving(true);
 
       try {
+        const isPlatformAdmin = role === "platformAdmin";
         const response = await users.invite(
-          invites.filter((i) => i.email).map((memo) => ({ ...memo, role }))
+          invites
+            .filter((i) => i.email)
+            .map((memo) => ({
+              ...memo,
+              role: isPlatformAdmin ? UserRole.Admin : role,
+              platformAdmin: isPlatformAdmin,
+            }))
         );
         onSubmit();
 
@@ -153,6 +164,15 @@ function Invite({ onSubmit }: Props) {
       });
     }
 
+    if (user.isPlatformAdmin) {
+      memo.push({
+        type: "item",
+        label: t("Platform Admin"),
+        description: t("Can manage all workspaces from the platform console"),
+        value: "platformAdmin",
+      });
+    }
+
     return [
       ...memo,
       {
@@ -203,7 +223,7 @@ function Invite({ onSubmit }: Props) {
         <Flex gap={12} column>
           <InputSelect
             options={options}
-            onChange={(r) => setRole(r as UserRole)}
+            onChange={(r) => setRole(r as UserRole | "platformAdmin")}
             value={role}
             label={t("Invite as")}
           />

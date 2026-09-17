@@ -10,6 +10,7 @@ import {
   resendInvite,
   revokeInvite,
   suspendUser,
+  togglePlatformAdmin,
 } from "~/actions/definitions/users";
 import { useMenuAction } from "~/hooks/useMenuAction";
 
@@ -31,6 +32,8 @@ export function useUserMenuActions() {
       revokeInvite,
       activateUser,
       suspendUser,
+      ActionSeparator,
+      togglePlatformAdmin,
       ActionSeparator,
       deleteUser,
     ],
