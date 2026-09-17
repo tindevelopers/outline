@@ -338,10 +338,31 @@ export function applyStatementTimeoutToTransactions(
     instance
   ) as Sequelize["transaction"];
 
-  const setLocalTimeout = (t: Transaction) =>
-    instance.query(`SET LOCAL statement_timeout = ${timeoutMs}`, {
-      transaction: t,
-    });
+  const setLocalContext = (t: Transaction) => {
+    const store = requestContext.getStore();
+    const tenant = store?.tenant;
+
+    // An authenticated API transaction is assigned a tenant identity, enabling
+    // row-level security: the transaction may only read/write rows belonging to
+    // that team (platform admins bypass). All other transactions (background
+    // workers, anonymous/public requests, non-HTTP contexts) are marked
+    // `app.rls_forced = 'off'` so they are not restricted; they are already
+    // governed by application-level authorization.
+    const tenantContext = tenant
+      ? [
+          `SET LOCAL app.team_id = '${tenant.teamId.replace(/'/g, "''")}'`,
+          `SET LOCAL app.is_platform_admin = '${tenant.isPlatformAdmin ? "on" : "off"}'`,
+          `SET LOCAL app.rls_forced = 'on'`,
+        ]
+      : [`SET LOCAL app.rls_forced = 'off'`];
+
+    return instance.query(
+      [`SET LOCAL statement_timeout = ${timeoutMs}`, ...tenantContext].join(
+        ";\n"
+      ),
+      { transaction: t }
+    );
+  };
 
   instance.transaction = (async (
     optionsOrCallback?:
@@ -358,14 +379,14 @@ export function applyStatementTimeoutToTransactions(
 
     if (autoCallback) {
       return origTransaction(options as TransactionOptions, async (t) => {
-        await setLocalTimeout(t);
+        await setLocalContext(t);
         return autoCallback(t);
       });
     }
 
     const t = await origTransaction(options);
     try {
-      await setLocalTimeout(t);
+      await setLocalContext(t);
     } catch (err) {
       // Roll back so the started transaction does not linger on the pooled
       // connection until idle-in-transaction timeout closes it.

@@ -8,6 +8,7 @@ import tracer, {
   getRootSpanFromRequestContext,
 } from "@server/logging/tracer";
 import { User, Team, ApiKey, OAuthAuthentication } from "@server/models";
+import { requestContext } from "@server/storage/requestContext";
 import type { AppContext } from "@server/types";
 import { AuthenticationType } from "@server/types";
 import { getJWTPayload, getUserForJWT } from "@server/utils/jwt";
@@ -72,6 +73,17 @@ export default function auth(options: AuthenticationOptions = {}) {
         service,
         scope,
       };
+
+      // Publish the tenant for the current request so database transactions can
+      // set `app.team_id` for row-level security. Only set when the request is
+      // inside an HTTP request context.
+      const store = requestContext.getStore();
+      if (store) {
+        store.tenant = {
+          teamId: user.teamId,
+          isPlatformAdmin: user.isPlatformAdmin,
+        };
+      }
 
       if (tracer) {
         addTags(
