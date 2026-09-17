@@ -213,6 +213,21 @@ export function createDatabaseInstance(
     instance.addHook("beforeFind", assertConnectionOpen);
     instance.addHook("beforeCount", assertConnectionOpen);
 
+    // Route reads through the request's tenant-scoped transaction if one is
+    // active, so row-level security set on that transaction applies to reads
+    // too. Only inject when the caller has not supplied its own transaction
+    // (either explicitly or via the request's `transaction()` middleware).
+    const routeReadsThroughRequestTransaction = (
+      options: { transaction?: Transaction | null }
+    ) => {
+      const store = requestContext.getStore();
+      if (store?.transaction && options.transaction === undefined) {
+        options.transaction = store.transaction;
+      }
+    };
+    instance.addHook("beforeFind", routeReadsThroughRequestTransaction);
+    instance.addHook("beforeCount", routeReadsThroughRequestTransaction);
+
     // Add hooks to warn about write operations on read-only connections
     if (isReadOnly) {
       const warnWriteOperation = (operation: string) => {

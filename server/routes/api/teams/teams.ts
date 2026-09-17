@@ -15,6 +15,7 @@ import { presentTeam, presentPolicies } from "@server/presenters";
 import type { APIContext } from "@server/types";
 import { RateLimiterStrategy } from "@server/utils/RateLimiter";
 import { safeEqual } from "@server/utils/crypto";
+import { setTenantForTransaction } from "@server/utils/rls";
 import * as T from "./schema";
 
 const router = new Router();
@@ -144,6 +145,14 @@ router.post(
       name,
       subdomain: name,
       authenticationProviders,
+    });
+
+    // The new team's admin user belongs to the new team, whose id differs from
+    // the actor's current team. Re-point the tenant context to the new team so
+    // row-level security allows the insert below.
+    await setTenantForTransaction(transaction, {
+      teamId: team.id,
+      isPlatformAdmin: user.isPlatformAdmin,
     });
 
     const newUser = await User.createWithCtx(ctx, {

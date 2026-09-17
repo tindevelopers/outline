@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { IncomingMessage } from "node:http";
+import type { Transaction } from "sequelize";
 
 /**
  * Tenant context resolved by the authentication middleware for the current
@@ -23,4 +24,5 @@ export type TenantContext = {
 export const requestContext = new AsyncLocalStorage<{
   req: IncomingMessage;
   tenant?: TenantContext;
+  transaction?: Transaction;
 }>();

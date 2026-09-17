@@ -105,6 +105,39 @@ export default function auth(options: AuthenticationOptions = {}) {
       }
     }
 
+    const store = requestContext.getStore();
+    const tenant = store?.tenant;
+
+    // When running inside an HTTP request with a resolved tenant, wrap the
+    // remainder of the request in a tenant-scoped transaction so row-level
+    // security also applies to reads (which otherwise run against the shared
+    // connection pool with no per-request tenant context). The transaction is
+    // pinned to the request and injects `app.team_id` on begin, so every query
+    // issued during the request inherits the tenant that RLS enforces against.
+    // It is committed once the route completes, releasing the pinned connection.
+    //
+    // Requests without a tenant (anonymous/public) and non-HTTP contexts
+    // (workers, collaboration) skip this wrapper: they rely on the transaction
+    // wrapper alone, where RLS stays default-allow.
+    //
+    // `sequelize` is imported at runtime rather than at module load: this module
+    // is loaded during model registration, and a static import of the shared
+    // instance would re-enter the storage/database initializer before it has
+    // built the singleton, creating a second, partially-mapped instance.
+    if (store && tenant) {
+      const { sequelize } = await import("@server/storage/database");
+      const t = await sequelize.transaction();
+      store.transaction = t;
+      try {
+        await next();
+        await t.commit();
+      } catch (err) {
+        await t.rollback().catch(() => undefined);
+        throw err;
+      }
+      return;
+    }
+
     return next();
   };
 }
