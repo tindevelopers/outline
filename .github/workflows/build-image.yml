@@ -7,9 +7,15 @@ name: Build and publish image
 # pulls the published `outlinewiki/outline-base`, which contains upstream
 # Outline and none of this fork's changes.
 #
-# The base is built and loaded into the runner's local Docker daemon, then the
-# final stage consumes it by that local tag. This avoids publishing the
-# intermediate base image and avoids digest pinning.
+# The two stages deliberately use different builders:
+#
+#   - The base stage runs under buildx so it can use the GitHub Actions cache,
+#     which makes the expensive `yarn install --immutable` layer reusable across
+#     commits. `load: true` puts the result in the Docker daemon's image store.
+#   - The final stage runs under plain `docker build`, because buildx's
+#     docker-container driver keeps a separate image store and cannot see an
+#     image that was loaded into the daemon. Under buildx, `BASE_IMAGE` would be
+#     resolved as a registry reference and fail with "pull access denied".
 #
 # Only linux/amd64 is built, matching the deployment target. GitHub's standard
 # ubuntu runners are amd64, so the build is native rather than emulated.
@@ -57,8 +63,6 @@ jobs:
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
-      # The expensive layer is `yarn install --immutable`, which is keyed off
-      # package.json and yarn.lock and therefore caches well across commits.
       - name: Build base image
         uses: docker/build-push-action@v6
         with:
@@ -76,26 +80,47 @@ jobs:
             'grep -rl "ops.teams.impersonate" build/server/routes/api/ops/ops.js'
 
       - name: Build and publish final image
-        uses: docker/build-push-action@v6
-        with:
-          file: Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            BASE_IMAGE=${{ env.BASE_IMAGE }}
-          cache-from: type=gha,scope=final
-          cache-to: type=gha,scope=final,mode=max
+        run: |
+          set -euo pipefail
+
+          args=(--build-arg "BASE_IMAGE=${BASE_IMAGE}")
+
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && args+=(-t "$tag")
+          done <<< "${{ steps.meta.outputs.tags }}"
+
+          while IFS= read -r label; do
+            [ -n "$label" ] && args+=(--label "$label")
+          done <<< "${{ steps.meta.outputs.labels }}"
+
+          docker build "${args[@]}" .
+
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            echo "::group::Pushing $tag"
+            docker push "$tag"
+            echo "::endgroup::"
+          done <<< "${{ steps.meta.outputs.tags }}"
+
+      # Guard against publishing a foreign-architecture image, which would fail
+      # with `exec format error` on an x86-64 host rather than at build time.
+      - name: Verify published architecture
+        run: |
+          set -euo pipefail
+          image="${IMAGE_NAME}:${GITHUB_SHA::7}"
+          arch=$(docker image inspect "$image" --format '{{.Architecture}}')
+          echo "Published architecture: $arch"
+          [ "$arch" = "amd64" ] || { echo "::error::expected amd64, got $arch"; exit 1; }
 
       - name: Summary
         run: |
           {
             echo "### Published"
             echo ""
-            echo "| Tag | Value |"
+            echo "| | |"
             echo "| --- | --- |"
             echo "| Commit | \`${GITHUB_SHA::7}\` |"
+            echo "| Architecture | linux/amd64 |"
             while IFS= read -r tag; do
               [ -n "$tag" ] && echo "| Image | \`$tag\` |"
             done <<< "${{ steps.meta.outputs.tags }}"
