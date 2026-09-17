@@ -1,0 +1,58 @@
+# Local rehearsal of the production deployment, matching what will run on
+# Hetzner: the Outline image plus Redis in containers, with PostgreSQL provided
+# by the remote Neon instance configured in `.env`.
+#
+# The image must be built in two stages, because `Dockerfile` only repackages a
+# prebuilt base and does not compile from source. Build the base first:
+#
+#   docker build -f Dockerfile.base -t outline-base:local .
+#   docker compose -f docker-compose.production.yml up -d --build
+#
+# Secrets are read from `.env`, which is gitignored and excluded from the build
+# context by `.dockerignore`.
+services:
+  redis:
+    image: redis
+    restart: unless-stopped
+    user: "redis:redis"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  outline:
+    image: outline:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Pin the base to the locally built image. Without this, `Dockerfile`
+        # defaults to the published `outlinewiki/outline-base`, which contains
+        # upstream Outline and none of this fork's changes.
+        BASE_IMAGE: outline-base:local
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      URL: http://localhost:3000
+      PORT: "3000"
+      # Reach Redis over the compose network; the `127.0.0.1` value in `.env`
+      # would resolve to the container itself.
+      REDIS_URL: redis://redis:6379
+      FILE_STORAGE: local
+      FORCE_HTTPS: "false"
+      # Single web process: keeps memory bounded locally and matches a small
+      # single-vCPU server. Raise this once the box has spare RAM.
+      WEB_CONCURRENCY: "1"
+      DEVELOPMENT_UNSAFE_INLINE_CSP: "false"
+    volumes:
+      - outline-data:/var/lib/outline/data
+    restart: unless-stopped
+
+volumes:
+  outline-data:
