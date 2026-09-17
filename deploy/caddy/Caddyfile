@@ -1,0 +1,48 @@
+# TLS termination for the multi-tenant Outline deployment at docs.roomzz.net.
+#
+# Tenant workspaces are served from <tenant>.docs.roomzz.net, because "docs" is
+# not in RESERVED_SUBDOMAINS (shared/utils/domains.ts:102) and therefore forms
+# the base domain that parseDomain() strips tenant labels from. A reserved label
+# such as "app" would instead be discarded, making the base domain roomzz.net
+# and silently moving every tenant onto the root zone.
+#
+# Both names are listed so a single certificate covers the app apex and every
+# tenant. A wildcard alone would not cover docs.roomzz.net itself.
+#
+# Credentials come from the container environment: CF_API_TOKEN and ACME_EMAIL.
+# The token needs only Zone -> DNS -> Edit on roomzz.net.
+{
+	email {env.ACME_EMAIL}
+}
+
+docs.roomzz.net, *.docs.roomzz.net {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+
+	encode zstd gzip
+
+	# Collaborative editing holds a websocket open on /realtime
+	# (server/services/websockets.ts:34). Caddy performs the upgrade
+	# automatically; disabling buffering on this route keeps edit updates from
+	# being held in the proxy.
+	@realtime path /realtime /realtime/*
+	reverse_proxy @realtime outline:3000 {
+		flush_interval -1
+	}
+
+	reverse_proxy outline:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# The editor renders user-supplied HTML, so stop the browser sniffing a
+		# response into a different MIME type.
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	# Outline accepts uploads up to FILE_STORAGE_UPLOAD_MAX_SIZE (250 MB).
+	# Caddy imposes no body limit, so nothing needs raising here. This is also
+	# why the tenant records must stay DNS-only (grey cloud): proxying through
+	# Cloudflare would cap uploads at 100 MB on a free plan.
+}

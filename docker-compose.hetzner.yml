@@ -1,0 +1,82 @@
+# Server-side deployment for a single Hetzner host.
+#
+# Pulls the published image and never builds Outline. The image is produced by
+# the `Build and publish image` GitHub Actions workflow on every push to main;
+# compiling on a 2 GB server will exhaust its memory.
+#
+# The only build here is the small Caddy image, which exists solely to add the
+# Cloudflare DNS plugin needed for wildcard certificates.
+#
+# Deploy:
+#
+#   scp -r deploy docker-compose.hetzner.yml root@<host>:/root/outline/
+#   scp .env.production root@<host>:/root/outline/.env
+#   ssh root@<host> 'cd /root/outline && docker compose -f docker-compose.hetzner.yml up -d --build'
+#
+# Pin the deployed revision with OUTLINE_TAG in `.env`. Unset falls back to
+# `latest`, which moves on every push to main.
+services:
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    user: "redis:redis"
+    # Bull queues and collaboration state live in Redis. Persisting it means a
+    # container restart does not drop queued jobs such as pending invite emails.
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  outline:
+    image: ghcr.io/tindevelopers/outline:${OUTLINE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    # Loopback only. Caddy is the sole public entry point; publishing this on
+    # 0.0.0.0 would expose an unencrypted port that bypasses TLS and any
+    # proxy-level protection.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # Uploaded attachments when FILE_STORAGE=local. Back this directory up.
+      - outline-data:/var/lib/outline/data
+    logging: *logging
+
+  caddy:
+    build: ./deploy/caddy
+    restart: unless-stopped
+    depends_on:
+      - outline
+    ports:
+      - "80:80"
+      - "443:443"
+      # HTTP/3
+      - "443:443/udp"
+    environment:
+      # Interpolated by compose from `.env` in this directory. Kept explicit
+      # rather than using env_file so the database and app secrets are not
+      # injected into the proxy container.
+      CF_API_TOKEN: ${CF_API_TOKEN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      # /data holds the ACME account key and issued certificates. Losing it
+      # forces re-issuance and risks hitting Let's Encrypt rate limits.
+      - caddy-data:/data
+      - caddy-config:/config
+    logging: *logging
+
+volumes:
+  redis-data:
+  outline-data:
+  caddy-data:
+  caddy-config:

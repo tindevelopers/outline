@@ -15,6 +15,8 @@ crowdin.yml
 lint-staged.config.mjs
 build
 docker-compose.yml
+docker-compose.*.yml
+deploy
 node_modules
 .yarn
 **/*.test.ts
