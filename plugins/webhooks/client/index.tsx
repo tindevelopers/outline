@@ -12,7 +12,7 @@ PluginManager.add([
       after: "Shared Links",
       icon: Icon,
       description:
-        "Automate downstream workflows with real-time JSON POSTs, subscribe to events in Outline so external systems can react instantly.",
+        "Automate downstream workflows with real-time JSON POSTs, subscribe to events in TIN Vault so external systems can react instantly.",
       component: createLazyComponent(() => import("./Settings")),
     },
   },

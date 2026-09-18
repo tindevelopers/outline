@@ -11,7 +11,7 @@ PluginManager.add([
       group: "Integrations",
       icon: Icon,
       description:
-        "Connect your Outline workspace to Zapier to automate workflows and integrate with thousands of other tools.",
+        "Connect your TIN Vault workspace to Zapier to automate workflows and integrate with thousands of other tools.",
       component: createLazyComponent(() => import("./Settings")),
     },
   },

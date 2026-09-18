@@ -19,7 +19,7 @@ export default () => (
                 : "cid:header-image"
             }
             height="48"
-            width="48"
+            width="159"
           />
         </TD>
       </TR>

@@ -63,7 +63,7 @@ export async function validateHost(input: string): Promise<string> {
 
   const config = await Desktop.bridge.loadAuthConfig(origin);
   if (!Array.isArray(config?.providers)) {
-    throw new Error("Host is not an Outline installation");
+    throw new Error("Host is not a TIN Vault installation");
   }
 
   return origin;

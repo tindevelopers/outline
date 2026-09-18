@@ -4,6 +4,7 @@ import { s } from "@shared/styles";
 import Heading from "~/components/Heading";
 import PageTitle from "~/components/PageTitle";
 import Text from "~/components/Text";
+import env from "~/env";
 
 /**
  * Renders the "Signing in…" screen shown while a login is being completed in
@@ -21,7 +22,8 @@ export function SigningIn() {
       <Heading centered>{t("Signing in")}…</Heading>
       <Note>
         {t(
-          "You can safely close this window once the Outline desktop app has opened"
+          "You can safely close this window once the {{ appName }} desktop app has opened",
+          { appName: env.APP_NAME }
         )}
         .
       </Note>

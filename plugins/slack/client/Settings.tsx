@@ -134,7 +134,8 @@ function Slack() {
                 <ConnectedButton
                   onClick={commandIntegration.delete}
                   confirmationMessage={t(
-                    "This will remove the Outline slash command from your Slack workspace. Are you sure?"
+                    "This will remove the {{ appName }} slash command from your Slack workspace. Are you sure?",
+                    { appName }
                   )}
                 />
               ) : (

@@ -8,6 +8,7 @@ import Spinner from "@shared/components/Spinner";
 import ButtonLarge from "~/components/ButtonLarge";
 import Input from "~/components/Input";
 import Text from "~/components/Text";
+import env from "~/env";
 import { DefaultHostname, navigateToHost, validateHost } from "../urls";
 
 type Status = "idle" | "checking" | "valid" | "invalid";
@@ -86,7 +87,9 @@ export function SwitchHostDialog() {
   return (
     <form onSubmit={handleSubmit}>
       <Text as="p">
-        {t("Enter the address of an Outline workspace to connect")}
+        {t("Enter the address of a {{ appName }} workspace to connect", {
+          appName: env.APP_NAME,
+        })}
       </Text>
       <Input
         autoFocus

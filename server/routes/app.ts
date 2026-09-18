@@ -186,7 +186,7 @@ export const renderApp = async (
       rel="search"
       type="application/opensearchdescription+xml"
       href="/opensearch.xml"
-      title="Outline"
+      title="${env.APP_NAME}"
     />
     `;
   }
