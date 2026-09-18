@@ -306,7 +306,7 @@ async function provisionFirstCollection(
       "Integrations & API",
       "Our Editor",
       "Getting Started",
-      "What is Outline",
+      "What is TIN Vault",
     ];
 
     for (const title of onboardingDocs) {

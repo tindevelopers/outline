@@ -125,8 +125,8 @@ export default ({ mode }: ConfigEnv) =>
           ],
         },
         manifest: {
-          name: "Outline",
-          short_name: "Outline",
+          name: "TIN Vault",
+          short_name: "TIN Vault",
           theme_color: "#fff",
           background_color: "#fff",
           start_url: "/",

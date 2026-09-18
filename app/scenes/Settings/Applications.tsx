@@ -12,6 +12,7 @@ import { createOAuthClient } from "~/actions/definitions/oauthClients";
 import useCurrentTeam from "~/hooks/useCurrentTeam";
 import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
+import env from "~/env";
 import OAuthClientListItem from "./components/OAuthClientListItem";
 
 function Applications() {
@@ -41,7 +42,8 @@ function Applications() {
       <Heading>{t("Applications")}</Heading>
       <Text as="p" type="secondary">
         <Trans
-          defaults="Applications allow you to build internal or public integrations with Outline and provide secure access via OAuth. For more details see the <em>developer documentation</em>."
+          defaults="Applications allow you to build internal or public integrations with {{ appName }} and provide secure access via OAuth. For more details see the <em>developer documentation</em>."
+          values={{ appName: env.APP_NAME }}
           components={{
             em: (
               <a
