@@ -12,7 +12,7 @@ export const opensearchResponse = (baseUrl: string): string => `
   <ShortName>${env.APP_NAME}</ShortName>
   <Description>Search ${env.APP_NAME}</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Image width="16" height="16" type="image/x-icon">${baseUrl}/images/favicon-16.png</Image>
+  <Image width="16" height="16" type="image/x-icon">${baseUrl}/images/favicon-16.png?v=tin-20260918</Image>
   <Url type="text/html" method="get" template="${baseUrl}/search/{searchTerms}?ref=opensearch"/>
   <moz:SearchForm>${baseUrl}/search</moz:SearchForm>
 </OpenSearchDescription>

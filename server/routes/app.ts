@@ -95,7 +95,7 @@ export const renderApp = async (
     description = "A modern team knowledge base for your internal documentation, product specs, support answers, meeting notes, onboarding, &amp; more…",
     canonical = "",
     content = "",
-    shortcutIcon = `${env.CDN_URL || ""}/images/favicon-32.png`,
+    shortcutIcon = `${env.CDN_URL || ""}/images/favicon-32.png?v=tin-20260918`,
     allowIndexing = true,
   } = options;
 
@@ -148,6 +148,12 @@ export const renderApp = async (
       href="${escape(shortcutIcon)}"
       sizes="32x32"
     />
+    <link
+      rel="icon"
+      type="image/png"
+      href="${env.CDN_URL ?? ""}/images/favicon-16.png?v=tin-20260918"
+      sizes="16x16"
+    />
     `;
 
   if (options.isShare) {
@@ -157,23 +163,23 @@ export const renderApp = async (
   } else {
     headTags += prefetchTags;
     headTags += `
-    <link rel="manifest" href="/static/manifest.webmanifest" />
+    <link rel="manifest" href="/static/manifest.webmanifest?v=tin-20260918" />
     <link
       rel="apple-touch-icon"
       type="image/png"
-      href="${env.CDN_URL ?? ""}/images/icon-maskable-192.png"
+      href="${env.CDN_URL ?? ""}/images/icon-maskable-192.png?v=tin-20260918"
       sizes="192x192"
     />
     <link
       rel="apple-touch-icon"
       type="image/png"
-      href="${env.CDN_URL ?? ""}/images/icon-maskable-512.png"
+      href="${env.CDN_URL ?? ""}/images/icon-maskable-512.png?v=tin-20260918"
       sizes="512x512"
     />
     <link
       rel="apple-touch-icon"
       type="image/png"
-      href="${env.CDN_URL ?? ""}/images/icon-maskable-1024.png"
+      href="${env.CDN_URL ?? ""}/images/icon-maskable-1024.png?v=tin-20260918"
       sizes="1024x1024"
     />
     <link
