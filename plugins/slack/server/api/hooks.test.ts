@@ -220,7 +220,7 @@ describe("#hooks.slack", () => {
     expect(body.response_type).toEqual("ephemeral");
     expect(body.blocks.length).toEqual(1);
     expect(body.blocks[0].text.text).toContain(
-      "It looks like you haven’t linked your Outline account to Slack yet"
+      "It looks like you haven’t linked your TIN Vault account to Slack yet"
     );
   });
 
