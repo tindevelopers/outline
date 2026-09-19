@@ -1,0 +1,159 @@
+name: Upstream sync
+
+on:
+  schedule:
+    - cron: "17 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPOSITORY: outline/outline
+  UPSTREAM_BRANCH: main
+
+jobs:
+  sync:
+    if: ${{ github.repository == 'tindevelopers/outline' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout protected base
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Configure merge identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
+          git fetch --no-tags upstream "${UPSTREAM_BRANCH}"
+
+      - name: Prepare update branch
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          base_sha=$(git rev-parse HEAD)
+          upstream_sha=$(git rev-parse "upstream/${UPSTREAM_BRANCH}")
+          short_sha=${upstream_sha:0:12}
+          branch="upstream-sync/${short_sha}"
+
+          {
+            echo "upstream_sha=${upstream_sha}"
+            echo "short_sha=${short_sha}"
+            echo "branch=${branch}"
+            echo "existing_pr_url="
+          } >> "$GITHUB_OUTPUT"
+
+          if git merge-base --is-ancestor "$upstream_sha" "$base_sha"; then
+            echo "result=up-to-date" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1; then
+            pr=$(gh pr list \
+              --base main \
+              --head "$branch" \
+              --state all \
+              --json state,url \
+              --jq '.[0] // empty')
+
+            if [ -z "$pr" ]; then
+              echo "result=branch-ready" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            state=$(jq -r '.state' <<< "$pr")
+            url=$(jq -r '.url' <<< "$pr")
+            {
+              echo "result=pull-request-${state,,}"
+              echo "existing_pr_url=${url}"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git switch -c "$branch"
+
+          if ! git merge --no-ff --no-commit "$upstream_sha"; then
+            git merge --abort
+            {
+              echo "### Upstream sync blocked"
+              echo
+              echo "Merging \`${short_sha}\` into \`main\` produced conflicts."
+              echo "No branch was pushed and \`main\` was not changed."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          git restore --source="$base_sha" --staged --worktree .github
+          git commit -m "chore: merge upstream ${short_sha}"
+          git push origin "HEAD:refs/heads/${branch}"
+          echo "result=branch-ready" >> "$GITHUB_OUTPUT"
+
+      - name: Open update pull request
+        id: pull-request
+        if: ${{ steps.prepare.outputs.result == 'branch-ready' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.prepare.outputs.branch }}
+          SHORT_SHA: ${{ steps.prepare.outputs.short_sha }}
+          UPSTREAM_SHA: ${{ steps.prepare.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+
+          body=$(mktemp)
+          cat > "$body" <<EOF
+          ## Upstream update
+
+          This pull request merges \`outline/outline@${UPSTREAM_SHA}\` into this fork.
+
+          Safety controls:
+
+          - the update is isolated on \`${BRANCH}\`;
+          - \`main\` was not modified directly;
+          - the fork's entire \`.github/\` directory was preserved;
+          - force-pushes and automatic merging are disabled;
+          - the required \`ci\` check must pass before review and merge.
+
+          Review upstream workflow changes separately before intentionally adopting any of them.
+          EOF
+
+          url=$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore: merge upstream ${SHORT_SHA}" \
+            --body-file "$body")
+
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+          gh workflow run ci.yml --ref "$BRANCH"
+
+      - name: Summarize
+        env:
+          RESULT: ${{ steps.prepare.outputs.result }}
+          BRANCH: ${{ steps.prepare.outputs.branch }}
+          PULL_REQUEST_URL: ${{ steps.pull-request.outputs.url || steps.prepare.outputs.existing_pr_url }}
+        run: |
+          {
+            echo "### Upstream sync"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Result | \`${RESULT}\` |"
+            echo "| Update branch | \`${BRANCH}\` |"
+            if [ -n "$PULL_REQUEST_URL" ]; then
+              echo "| Pull request | ${PULL_REQUEST_URL} |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
