@@ -30,7 +30,10 @@ You're an expert in the following areas:
 
 ## General Guidelines
 
-- Critical – Do not create new markdown (.md) files.
+- Create new Markdown (`.md`) files only when the user explicitly requests
+  them or an approved plan requires intentional, durable documentation. Do
+  not create generated status reports, scratch notes, or redundant
+  documentation.
 - Use early returns for readability.
 - Emphasize type safety and static analysis.
 - Follow consistent oxfmt formatting.
