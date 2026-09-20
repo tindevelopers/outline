@@ -1,6 +1,7 @@
 import Router from "koa-router";
 import { TeamPreference } from "@shared/types";
 import env from "@server/env";
+import { getOAuthOrigin } from "@server/utils/oauth";
 import { getTeamFromContext } from "@server/utils/passport";
 
 const router = new Router();
@@ -11,12 +12,8 @@ router.get(
     "/.well-known/oauth-authorization-server/mcp",
   ],
   async (ctx) => {
-    // Use the configured URL for self-hosted deployments to preserve the port when behind
-    // a reverse proxy that may strip the port from the Host header.
-    const origin = env.isCloudHosted
-      ? ctx.request.URL.origin
-      : new URL(env.URL).origin;
     const team = await getTeamFromContext(ctx, { includeOAuthState: false });
+    const origin = getOAuthOrigin(ctx, team);
     const mcpEnabled = team?.getPreference(TeamPreference.MCP) ?? true;
 
     ctx.body = {
@@ -51,11 +48,7 @@ router.get(
       return;
     }
 
-    // Use the configured URL for self-hosted deployments to preserve the port when behind
-    // a reverse proxy that may strip the port from the Host header.
-    const origin = env.isCloudHosted
-      ? ctx.request.URL.origin
-      : new URL(env.URL).origin;
+    const origin = getOAuthOrigin(ctx, team);
 
     ctx.body = {
       resource: `${origin}/mcp`,

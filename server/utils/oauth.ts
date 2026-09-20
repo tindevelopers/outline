@@ -5,6 +5,7 @@ import { errToString } from "@shared/utils/error";
 import { randomString } from "@shared/random";
 import { getCookieDomain } from "@shared/utils/domains";
 import env from "@server/env";
+import type { Team } from "@server/models";
 import Logger from "@server/logging/Logger";
 import {
   AuthenticationError,
@@ -205,4 +206,31 @@ export default abstract class OAuthClient {
         : undefined,
     };
   }
+}
+
+/**
+ * The origin that OAuth and MCP discovery documents should advertise.
+ *
+ * On the official cloud deployment this is simply the request origin. On a
+ * self-hosted install it is normally the configured base URL, which also
+ * preserves the port when a reverse proxy strips it from the Host header. On
+ * a self-hosted multi-tenant install, however, a request that arrives on a
+ * tenant's own host (subdomain or custom domain) must be answered with that
+ * tenant's origin. Otherwise an MCP client is sent to the base domain's
+ * authorization server and ends up authorizing against the wrong team.
+ *
+ * @param ctx The Koa context for the discovery or MCP request.
+ * @param team The team resolved from the request host, if any.
+ * @returns The origin, without a trailing slash.
+ */
+export function getOAuthOrigin(ctx: Context, team?: Team | null): string {
+  if (env.isCloudHosted) {
+    return ctx.request.URL.origin;
+  }
+
+  if (team?.isTeamUrl(ctx.href)) {
+    return new URL(team.url).origin;
+  }
+
+  return new URL(env.URL).origin;
 }
