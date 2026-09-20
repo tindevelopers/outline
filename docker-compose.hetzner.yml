@@ -15,6 +15,12 @@
 #
 # Pin the deployed revision with OUTLINE_TAG in `.env`. Unset falls back to
 # `latest`, which moves on every push to main.
+#
+# `watchtower` closes the last gap: without it, a new `latest` image sitting
+# in GHCR never reaches this host until someone SSHes in and runs
+# `docker compose pull && up -d` by hand. It polls GHCR on WATCHTOWER_POLL_INTERVAL,
+# and only recreates containers labeled `com.centurylinklabs.watchtower.enable`
+# (just `outline` below) so `redis` and `caddy` are never bounced by it.
 services:
   redis:
     image: redis:7
@@ -51,6 +57,9 @@ services:
       # Uploaded attachments when FILE_STORAGE=local. Back this directory up.
       - outline-data:/var/lib/outline/data
     logging: *logging
+    labels:
+      # Opts this container into watchtower's auto-update polling below.
+      - "com.centurylinklabs.watchtower.enable=true"
 
   caddy:
     build: ./deploy/caddy
@@ -73,6 +82,24 @@ services:
       # forces re-issuance and risks hitting Let's Encrypt rate limits.
       - caddy-data:/data
       - caddy-config:/config
+    logging: *logging
+
+  watchtower:
+    # containrrr/watchtower is unmaintained and hardcodes a Docker API version
+    # (1.25) below what modern Docker Engine accepts (this host: 1.52).
+    # nickfedor/watchtower is the maintained continuation of the same project.
+    image: nickfedor/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      # ghcr.io/tindevelopers/outline is a public package: no registry
+      # credentials exist on this host (confirmed no /root/.docker/config.json)
+      # and none are needed for watchtower to pull it either.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_POLL_INTERVAL: "300"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
     logging: *logging
 
 volumes:
