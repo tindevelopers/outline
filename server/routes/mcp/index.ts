@@ -9,7 +9,6 @@ import { toError } from "@shared/utils/error";
 import { TeamPreference } from "@shared/types";
 import { iconNames } from "@shared/utils/IconNames";
 import { NotFoundError } from "@server/errors";
-import env from "@server/env";
 import Logger from "@server/logging/Logger";
 import auth from "@server/middlewares/authentication";
 import { rateLimiter } from "@server/middlewares/rateLimiter";
@@ -17,6 +16,8 @@ import requestTracer from "@server/middlewares/requestTracer";
 import { UserFlag } from "@server/models/User";
 import { AuthenticationType } from "@server/types";
 import { RateLimiterStrategy } from "@server/utils/RateLimiter";
+import { getOAuthOrigin } from "@server/utils/oauth";
+import { getTeamFromContext } from "@server/utils/passport";
 import { attachmentTools } from "@server/tools/attachments";
 import { collectionTools } from "@server/tools/collections";
 import { commentTools } from "@server/tools/comments";
@@ -48,9 +49,11 @@ app.use(async (ctx, next) => {
         (k) => k.toLowerCase() === "www-authenticate"
       );
       if (!hasWwwAuth) {
-        const origin = env.isCloudHosted
-          ? ctx.request.URL.origin
-          : new URL(env.URL).origin;
+        // A failure to resolve the team must never mask the 401 itself.
+        const team = await getTeamFromContext(ctx, {
+          includeOAuthState: false,
+        }).catch(() => null);
+        const origin = getOAuthOrigin(ctx, team);
         headersHost.headers = {
           ...existingHeaders,
           "WWW-Authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"`,
