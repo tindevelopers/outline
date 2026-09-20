@@ -99,6 +99,17 @@ export async function signIn(
   const domain = getCookieDomain(ctx.request.hostname, env.isCloudHosted);
   const expires = addMonths(new Date(), 3);
 
+  // OAuth providers only allow one fixed, pre-registered callback URL, so on
+  // a multi-tenant install the callback always lands on the base env.URL
+  // even when the team being signed into lives on a different tenant
+  // subdomain (the actual tenant travels through the provider's `state`
+  // param instead). If we set the session cookie here and then redirect to
+  // team.url, the browser lands on a host that never received the cookie.
+  // env.isCloudHosted alone doesn't catch this on self-hosted multi-tenant
+  // installs (it only recognizes the official getoutline.com deployment),
+  // so check directly whether the current host actually matches the team's.
+  const requiresCrossDomainTransfer = !team.isTeamUrl(ctx.href);
+
   // set a cookie for which service we last signed in with. This is
   // only used to display a UI hint for the user for next time
   ctx.cookies.set("lastSignedIn", service, {
@@ -143,7 +154,7 @@ export async function signIn(
 
   // Redirect to the team subdomain with a short-lived transfer token that the
   // /auth/redirect handler exchanges for the actual session cookie.
-  if (env.isCloudHosted && team.subdomain) {
+  if ((env.isCloudHosted || requiresCrossDomainTransfer) && team.subdomain) {
     const token = encodeURIComponent(user.getTransferToken(service));
     ctx.redirect(`${team.url}/auth/redirect?token=${token}`);
   } else {
