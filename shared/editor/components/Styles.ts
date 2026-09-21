@@ -681,6 +681,11 @@ width: 100%;
     font-weight: 600;
     cursor: text;
     clear: both;
+    // scrollIntoView aligns a scrolled-to heading with the top of the viewport,
+    // where the sticky header sits. Without this margin the heading and its
+    // first paragraph land underneath the header, so following a link in the
+    // contents appears to scroll past the section it targets.
+    scroll-margin-top: calc(var(--header-offset, ${HEADER_HEIGHT}px) + 8px);
 
     & + p,
     // accounts for block insert trigger and other widgets between heading and paragraph
