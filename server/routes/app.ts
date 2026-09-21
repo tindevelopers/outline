@@ -30,6 +30,30 @@ const viteHost = env.URL.replace(`:${env.PORT}`, ":3001");
 let indexHtmlCache: Buffer | undefined;
 
 /**
+ * Substitutes the `{token}` placeholders in the application HTML template.
+ *
+ * The substitution is performed in a single pass with a function replacer,
+ * which matters for two reasons: `String.prototype.replace` interprets `$`
+ * sequences in a string replacement (`$'`, `` $` ``, `$&`, `$$`) as patterns,
+ * so document content containing e.g. a shell snippet ending in `$'` would
+ * otherwise splice template markup into the page; and a single pass means the
+ * substituted value is never itself scanned for further tokens.
+ *
+ * @param template the HTML template containing `{token}` placeholders.
+ * @param values the value to insert for each token, keyed by token name.
+ * @returns the template with every known token substituted.
+ */
+export function replaceTemplateTokens(
+  template: string,
+  values: Record<string, string>
+): string {
+  return template.replace(
+    /\{([a-z-]+)\}/g,
+    (match, token: string) => values[token] ?? match
+  );
+}
+
+/**
  * Formats navigation tree children as markdown list items.
  *
  * @param children Array of navigation nodes
@@ -204,18 +228,18 @@ export const renderApp = async (
   ctx.response.set("Cache-Control", "no-cache, must-revalidate");
   ctx.response.set("Expires", "-1");
 
-  ctx.body = page
-    .toString()
-    .replace(/\{env\}/g, environment)
-    .replace(/\{lang\}/g, unicodeCLDRtoISO639(env.DEFAULT_LANGUAGE))
-    .replace(/\{title\}/g, escape(title))
-    .replace(/\{description\}/g, escape(description))
-    .replace(/\{content\}/g, content)
-    .replace(/\{cdn-url\}/g, env.CDN_URL || "")
-    .replace(/\{head-tags\}/g, headTags)
-    .replace(/\{slack-app-id\}/g, env.public.SLACK_APP_ID || "")
-    .replace(/\{script-tags\}/g, scriptTags)
-    .replace(/\{csp-nonce\}/g, ctx.state.cspNonce);
+  ctx.body = replaceTemplateTokens(page.toString(), {
+    env: environment,
+    lang: unicodeCLDRtoISO639(env.DEFAULT_LANGUAGE),
+    title: escape(title),
+    description: escape(description),
+    content,
+    "cdn-url": env.CDN_URL || "",
+    "head-tags": headTags,
+    "slack-app-id": env.public.SLACK_APP_ID || "",
+    "script-tags": scriptTags,
+    "csp-nonce": ctx.state.cspNonce,
+  });
 };
 
 export const renderShare = async (ctx: Context, next: Next) => {

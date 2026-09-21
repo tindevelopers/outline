@@ -66,6 +66,27 @@ describe("/s/:id", () => {
     expect(body).toContain(`<title>${document.title}</title>`);
   });
 
+  it("should not substitute dollar sequences in document content as replacement patterns", async () => {
+    // A shell snippet ending in a single-quoted `$` anchor contains `$'`, which
+    // `String.prototype.replace` reads as the portion of the template that
+    // follows the match. That used to splice the page's closing markup into the
+    // SSR content, closing the screenreader-only wrapper early and leaving its
+    // elements as direct children of the flex body.
+    const document = await buildDocument({
+      text: "Run `grep -oE 'Files.*\\(([0-9]+)\\)$' /tmp/auth.log`.",
+    });
+    const share = await buildShare({
+      documentId: document.id,
+      teamId: document.teamId,
+    });
+    const res = await server.get(`/s/${share.id}`);
+    const body = await res.text();
+    expect(res.status).toEqual(200);
+    expect(body).toContain("$'");
+    expect(body).not.toContain("{content}");
+    expect(body.match(/<\/body>/g)).toHaveLength(1);
+  });
+
   it("should return markdown when Accept header prefers text/markdown", async () => {
     const document = await buildDocument();
     const share = await buildShare({
