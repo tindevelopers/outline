@@ -14,11 +14,14 @@ import PinnedDocuments from "~/components/PinnedDocuments";
 import { ResizingHeightContainer } from "~/components/ResizingHeightContainer";
 import Scene from "~/components/Scene";
 import { Tab, Tabs } from "~/components/Tabs";
+import env from "~/env";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import { usePinnedDocuments } from "~/hooks/usePinnedDocuments";
 import usePersistedState from "~/hooks/usePersistedState";
 import useStores from "~/hooks/useStores";
 import NewDocumentMenu from "~/menus/NewDocumentMenu";
+import { shortRevision } from "~/utils/buildVersion";
+import { version as currentVersion } from "../../package.json";
 
 enum HomeTab {
   Viewed = "",
@@ -47,6 +50,15 @@ function Home() {
   const isIndex = !!useRouteMatch({ path: "/home", exact: true });
   const redirectTo =
     isIndex && homeTab !== HomeTab.Viewed ? `/home/${homeTab}` : undefined;
+
+  // `env.VERSION` is the commit the running image was built from, so the stamp
+  // changes on every deploy and tells an operator which revision is live.
+  // Falls back to just the package version when the build supplied no revision.
+  const buildVersion = env.VERSION as string | undefined;
+  const revision = shortRevision(buildVersion);
+  const buildStampTitle = buildVersion
+    ? `${currentVersion} (${buildVersion})`
+    : currentVersion;
 
   const recentlyViewed = (
     <PaginatedDocumentList
@@ -151,9 +163,28 @@ function Home() {
           <Route path="/home">{recentlyViewed}</Route>
         </Switch>
       </Documents>
+      <BuildStamp title={buildStampTitle}>
+        v{currentVersion}
+        {revision ? ` · ${revision}` : ""}
+      </BuildStamp>
     </Scene>
   );
 }
+
+/**
+ * The version stamp rendered at the foot of the home screen. Its tooltip carries
+ * the full revision so the short form above stays unambiguous.
+ */
+const BuildStamp = styled.div`
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid ${s("divider")};
+  color: ${s("textTertiary")};
+  font-family: ${(props) => props.theme.fontFamilyMono};
+  font-size: 12px;
+  user-select: text;
+  cursor: text;
+`;
 
 const Documents = styled.div`
   position: relative;
