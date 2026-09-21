@@ -74,6 +74,8 @@ export type AppState = {
   auth: Authentication | Record<string, never>;
   transaction: Transaction;
   pagination: Pagination;
+  /** The teams authorized to receive an inbound webhook. */
+  webhookTeamIds?: string[];
   oauthClient?: OAuthClient;
   oauthIntent?: OAuthIntent;
   oauthState?: OAuthState;
@@ -242,6 +244,8 @@ export type DocumentEvent = BaseEvent<Document> &
         createdAt: string;
         data?: {
           done: boolean;
+          /** The latest collaborator sequence included in the persisted snapshot. */
+          collaborators?: number;
         };
       }
     | {
