@@ -1,22 +1,21 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
+import { getBaseDomain } from "@shared/utils/domains";
 import Button from "~/components/Button";
 import { isValidWorkspaceSlug, tenantOriginFor } from "../urls";
 import { vaultTheme } from "../theme";
 
 const Box = styled.div`
-  margin-top: 22px;
-  padding: 18px;
-  border: 1px solid ${vaultTheme.line};
-  border-radius: ${vaultTheme.radiusSurface};
-  background: ${vaultTheme.card};
+  padding-top: 24px;
+  border-top: 1px solid ${vaultTheme.line};
 
-  .ws-title {
+  label {
+    display: block;
     margin: 0 0 10px;
-    font-size: 14px;
-    font-weight: 700;
-    color: ${vaultTheme.ink};
+    font-size: 13.5px;
+    font-weight: 600;
+    color: ${vaultTheme.navy800};
   }
 
   .input-row {
@@ -24,32 +23,49 @@ const Box = styled.div`
     gap: 8px;
   }
 
-  input {
+  .field {
     flex: 1;
     min-width: 0;
-    min-height: 46px;
+    display: flex;
+    align-items: center;
+    height: 46px;
     padding: 0 14px;
     border-radius: ${vaultTheme.radiusCtrl};
-    border: 1px solid ${vaultTheme.line};
+    border: 1px solid #d3dae4;
     background: ${vaultTheme.card};
-    color: ${vaultTheme.ink};
     font-family: ${vaultTheme.fontMono};
-    font-size: 14px;
+    font-size: 13.5px;
 
-    &::placeholder {
-      color: #7d8b9d;
-      font-family: ${vaultTheme.fontDisplay};
-    }
-
-    &:focus-visible {
+    &:focus-within {
       outline: 2px solid ${vaultTheme.orange};
       outline-offset: 2px;
     }
   }
 
+  input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    padding: 0;
+    background: transparent;
+    color: ${vaultTheme.navy800};
+    font: inherit;
+
+    &::placeholder {
+      color: #7d8b9d;
+    }
+  }
+
+  .suffix {
+    flex: none;
+    color: #6f7e93;
+  }
+
   button {
     width: auto;
-    min-width: 74px;
+    min-width: 64px;
+    height: 46px;
   }
 
   .helper {
@@ -97,27 +113,26 @@ export function WorkspaceFinder({ title }: Props) {
   return (
     <Box>
       <form onSubmit={handleSubmit}>
-        <p className="ws-title">{title}</p>
+        <label htmlFor="vault-workspace-finder">{title}</label>
         <div className="input-row">
-          <label
-            htmlFor="vault-workspace-finder"
-            style={{ position: "absolute", left: "-9999px" }}
-          >
-            {title}
-          </label>
-          <input
-            id="vault-workspace-finder"
-            name="slug"
-            placeholder={t("e.g. programming")}
-            autoComplete="off"
-            spellCheck={false}
-          />
+          <div className="field">
+            <input
+              id="vault-workspace-finder"
+              name="slug"
+              placeholder={t("programming")}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <span className="suffix" aria-hidden="true">
+              .{getBaseDomain()}
+            </span>
+          </div>
           <Button type="submit">{t("Go")}</Button>
         </div>
-        <p className="helper">
+        <p className="helper" aria-live="polite">
           {note ??
             t(
-              "Goes straight to that workspace sign-in. Nothing is suggested, listed or searched."
+              "Takes you to that workspace's sign-in. It never grants access by itself."
             )}
         </p>
       </form>

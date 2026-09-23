@@ -23,8 +23,8 @@ export const vaultTheme = {
   radiusCtrl: "10px",
   shadowCard:
     "0 1px 2px rgba(16, 32, 54, 0.05), 0 12px 32px rgba(16, 32, 54, 0.09)",
-  fontDisplay:
-    '"Manrope", "Segoe UI", system-ui, -apple-system, sans-serif',
+  fontDisplay: '"Manrope", "Segoe UI", system-ui, -apple-system, sans-serif',
+  fontBody: '"Inter", "Segoe UI", system-ui, -apple-system, sans-serif',
   fontMono: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
 } as const;
 

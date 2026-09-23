@@ -10,20 +10,30 @@ import { vaultTheme } from "../theme";
 import { WorkspaceFinder } from "./WorkspaceFinder";
 
 const Copy = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+
+  .intro {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
   h1 {
     margin: 0;
     font-family: ${vaultTheme.fontDisplay};
-    font-size: clamp(30px, 3.6vw, 44px);
-    line-height: 1.1;
+    font-weight: 800;
+    font-size: 32px;
+    line-height: 1.15;
     letter-spacing: -0.02em;
     color: ${vaultTheme.navy800};
   }
 
   .sub {
-    margin: 14px 0 30px;
-    max-width: 44ch;
-    font-size: 15.5px;
-    line-height: 1.6;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.55;
     color: ${vaultTheme.muted};
   }
 
@@ -32,33 +42,16 @@ const Copy = styled.div`
     flex-direction: column;
     gap: 10px;
 
-    /* Provider buttons render as left-aligned rows, not centered pills. */
     button {
-      justify-content: flex-start;
-      text-align: left;
+      height: 48px;
+      justify-content: center;
     }
   }
 
   .sent {
-    margin: 12px 0 0;
+    margin: 0;
     font-size: 13px;
     color: ${vaultTheme.muted};
-  }
-
-  .foot-line {
-    margin-top: 22px;
-    font-size: 13px;
-    color: ${vaultTheme.muted};
-
-    a {
-      color: ${vaultTheme.navy};
-      font-weight: 700;
-      text-decoration: none;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
   }
 `;
 
@@ -83,8 +76,8 @@ type Props = {
 };
 
 /**
- * The Launchpad sign-in column: headline, provider rows, email step and the
- * workspace finder, in the Paper and Ink editorial layout.
+ * The Launchpad sign-in column: one primary provider, the rest secondary,
+ * then the workspace finder.
  *
  * @returns The column element.
  */
@@ -94,14 +87,22 @@ export function AuthCard({ config }: Props) {
   const hints = React.useMemo(() => readSessionHints(), []);
   const lastHint = Object.values(hints)[0];
 
+  // Microsoft is TIN's primary identity provider; one solid button keeps the
+  // hierarchy clear instead of several competing ones.
+  const primaryId = config.providers.some((p) => p.id === "azure")
+    ? "azure"
+    : config.providers[0]?.id;
+
   return (
     <Copy>
-      <h1>{t("Sign in to TIN Vault.")}</h1>
-      <p className="sub">
-        {t(
-          "One identity for every team and client workspace. Your memberships decide where you can go."
-        )}
-      </p>
+      <div className="intro">
+        <h1>{t("Sign in to TIN Vault")}</h1>
+        <p className="sub">
+          {t(
+            "Use your work account. We'll show you only the workspaces you belong to."
+          )}
+        </p>
+      </div>
 
       <Notices />
 
@@ -125,6 +126,7 @@ export function AuthCard({ config }: Props) {
             authUrl={provider.authUrl}
             isCreate={false}
             preferOTP={false}
+            neutral={provider.id !== primaryId}
             onEmailSuccess={(email) => setEmailSentTo(email)}
           />
         ))}
@@ -145,20 +147,6 @@ export function AuthCard({ config }: Props) {
       ) : null}
 
       <WorkspaceFinder title={t("Know your workspace?")} />
-
-      <p className="foot-line">
-        {config.accessEmail ? (
-          <>
-            {t("Need access?")}{" "}
-            <a href={`mailto:${config.accessEmail}`}>
-              {t("Contact your TIN administrator")}
-            </a>
-            .
-          </>
-        ) : (
-          t("Need access? Contact your TIN administrator.")
-        )}
-      </p>
     </Copy>
   );
 }
