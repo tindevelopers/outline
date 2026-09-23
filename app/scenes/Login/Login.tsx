@@ -35,6 +35,7 @@ import Desktop from "~/utils/Desktop";
 import isCloudHosted from "~/utils/isCloudHosted";
 import { detectLanguage } from "~/utils/language";
 import { homePath } from "~/utils/routeHelpers";
+import { Launchpad } from "~/scenes/Launchpad";
 import AuthenticationProvider from "./components/AuthenticationProvider";
 import { BackButton } from "./components/BackButton";
 import { Background } from "./components/Background";
@@ -180,6 +181,12 @@ function Login({ children, onBack }: Props) {
   // indicator here that's delayed by 250ms
   if (!config) {
     return <LoadingIndicator />;
+  }
+
+  // The apex of a multi-tenant install, and unknown tenant subdomains, render
+  // the vault Launchpad instead of a team login screen.
+  if (config.vault || config.workspaceNotFound) {
+    return <Launchpad config={config} />;
   }
 
   // The passkey ceremony is triggered automatically here, so render the

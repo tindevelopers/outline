@@ -42,6 +42,12 @@ export type Config = {
   customTheme?: Partial<CustomTheme>;
   hostname?: string;
   providers: Provider[];
+  /** True when this host is the neutral vault entry point. */
+  vault?: boolean;
+  /** Contact address for requesting workspace access. */
+  accessEmail?: string;
+  /** True when the tenant subdomain is unknown or inaccessible. */
+  workspaceNotFound?: boolean;
 };
 
 export default class AuthStore extends Store<Team> {
