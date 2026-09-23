@@ -291,6 +291,20 @@ export default class AuthStore extends Store<Team> {
 
   requestDeleteUser = () => client.post(`/users.requestDelete`);
 
+  /**
+   * Mints a transfer handoff URL for another workspace the user is a member
+   * of, so switching never logs the current workspace out.
+   *
+   * @param teamId The id of the workspace to enter.
+   * @returns The tenant URL carrying a short-lived transfer token.
+   */
+  transferToTeam = async (teamId: string): Promise<string> => {
+    const res: { url: string } = await client.post("/vault.transfer", {
+      teamId,
+    });
+    return res.url;
+  };
+
   requestDeleteTeam = () => client.post(`/teams.requestDelete`);
 
   @action
