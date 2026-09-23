@@ -1,5 +1,6 @@
 import * as React from "react";
 import { client } from "~/utils/ApiClient";
+import { AuthorizationError } from "~/utils/errors";
 
 export type VaultWorkspace = {
   id: string;
@@ -30,6 +31,23 @@ function getStatus(err: unknown): number | undefined {
 }
 
 /**
+ * Reports whether a failed vault.workspaces call simply means "not signed
+ * in". ApiClient collapses 401 and 403 responses into its AuthorizationError
+ * class without a status field, so both the class and any raw status are
+ * checked.
+ *
+ * @param err The thrown value.
+ * @returns true when the visitor should be shown the sign-in card.
+ */
+export function isSignedOutError(err: unknown): boolean {
+  if (err instanceof AuthorizationError) {
+    return true;
+  }
+  const status = getStatus(err);
+  return status === 401 || status === 403;
+}
+
+/**
  * Loads the workspaces the current vault identity is a member of.
  *
  * @returns The reactive vault state for the Launchpad.
@@ -55,11 +73,8 @@ export function useVaultWorkspaces(): VaultState {
         if (!mounted) {
           return;
         }
-        // Both "no credentials" (401) and "credentials without vault access"
-        // (403) mean the visitor must sign in; anything else is a real fault.
-        const status = getStatus(err);
         setState(
-          status === 401 || status === 403
+          isSignedOutError(err)
             ? { status: "unauthenticated" }
             : { status: "error" }
         );
