@@ -6,52 +6,68 @@ import type { Config } from "~/stores/AuthStore";
 import { useVaultWorkspaces } from "~/hooks/useVaultWorkspaces";
 import { vaultTheme } from "./theme";
 import { AuthCard } from "./components/AuthCard";
-import { DocArt } from "./components/DocArt";
-import { TopBar } from "./components/TopBar";
+import { BrandPanel } from "./components/BrandPanel";
 import { VaultStatus } from "./components/VaultStatus";
 import { WorkspaceSelector } from "./components/WorkspaceSelector";
 
+// Two equal halves that always fill the viewport: navy brand panel, white
+// sign-in side. They stack on narrow screens.
 const Sheet = styled.main`
   min-height: 100dvh;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: #ffffff;
+  font-family: ${vaultTheme.fontBody};
+
+  @media (max-width: 940px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+`;
+
+const Side = styled.section`
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #ffffff 0%, ${vaultTheme.bg} 340px);
-  font-family: ${vaultTheme.fontDisplay};
-`;
-
-const Main = styled.div`
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
-  gap: 48px;
-  align-items: center;
-  width: 100%;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 12px 48px 120px;
-
-  @media (max-width: 940px) {
-    grid-template-columns: 1fr;
-    gap: 28px;
-    padding: 4px 20px 120px;
-  }
-`;
-
-const Foot = styled.footer`
-  border-top: 1px solid ${vaultTheme.line};
-  padding: 18px 48px;
-  display: flex;
   justify-content: space-between;
-  gap: 16px;
-  font-size: 12.5px;
-  color: ${vaultTheme.muted};
+  gap: 40px;
+  padding: 48px 64px;
+  color: ${vaultTheme.ink};
 
   .host {
+    align-self: flex-end;
     font-family: ${vaultTheme.fontMono};
+    font-size: 12.5px;
+    color: ${vaultTheme.muted};
+  }
+
+  .column {
+    width: 100%;
+    max-width: 400px;
+    align-self: center;
+  }
+
+  .access {
+    margin: 0;
+    font-size: 13px;
+    color: ${vaultTheme.muted};
+
+    a {
+      color: ${vaultTheme.navy600};
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+
+      &:hover {
+        color: ${vaultTheme.orange600};
+      }
+    }
   }
 
   @media (max-width: 940px) {
-    padding: 18px 20px;
+    padding: 28px 20px 40px;
+
+    .host {
+      display: none;
+    }
   }
 `;
 
@@ -167,17 +183,26 @@ export function Launchpad({ config }: Props) {
   return (
     <ThemeProvider theme={vaultAccentTheme}>
       <Sheet>
-        <TopBar host={host} />
-        <Main>
-          <div>{card}</div>
-          <DocArt />
-        </Main>
-        <Foot>
-          <span>
-            {t("Tenant-isolated workspaces. Single sign-on. Audited access.")}
+        <BrandPanel />
+        <Side>
+          <span className="host" aria-label={t("Current host")}>
+            {host}
           </span>
-          <span className="host">{host}</span>
-        </Foot>
+          <div className="column">{card}</div>
+          <p className="access">
+            {config.accessEmail ? (
+              <>
+                {t("Need access?")}{" "}
+                <a href={`mailto:${config.accessEmail}`}>
+                  {t("Contact your TIN administrator")}
+                </a>
+                .
+              </>
+            ) : (
+              t("Need access? Contact your TIN administrator.")
+            )}
+          </p>
+        </Side>
       </Sheet>
     </ThemeProvider>
   );
