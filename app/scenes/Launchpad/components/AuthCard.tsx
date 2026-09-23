@@ -5,6 +5,7 @@ import styled from "styled-components";
 import type { Config } from "~/stores/AuthStore";
 import Button from "~/components/Button";
 import AuthenticationProvider from "~/scenes/Login/components/AuthenticationProvider";
+import { Notices } from "~/scenes/Login/components/Notices";
 import { vaultTheme } from "../theme";
 import { WorkspaceFinder } from "./WorkspaceFinder";
 
@@ -101,6 +102,8 @@ export function AuthCard({ config }: Props) {
           "One identity for every team and client workspace. Your memberships decide where you can go."
         )}
       </p>
+
+      <Notices />
 
       <div className="rows">
         {lastHint ? (
