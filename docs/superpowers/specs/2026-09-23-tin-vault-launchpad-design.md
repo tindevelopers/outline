@@ -1,6 +1,6 @@
 # TIN Vault Launchpad: Design and Architecture Spec
 
-Status: proposed, awaiting approval
+Status: approved and implemented (commits c7a279d1b..9ff147bd6)
 Date: 2026-09-23
 Scope: design and architecture only. No implementation in this document's phase.
 Reference prototype: `design/tin-vault-launchpad/option-a-signal-gate.html` (chosen direction),

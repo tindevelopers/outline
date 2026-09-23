@@ -40,7 +40,7 @@
   - `export type VaultOutcome = { kind: "single"; user: User; team: Team } | { kind: "choice"; email: string } | { kind: "none"; email: string }`
   - `export async function routeVaultSignIn(ctx: Context, service: string, email: string): Promise<VaultOutcome>`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // server/utils/vault.test.ts
@@ -59,12 +59,12 @@ Cases (implement with a small `mockCtx(hostname)` helper that records `cookies.s
 4. `routeVaultSignIn` with zero memberships returns `{ kind: "none" }` and sets the cookie.
 5. `verifyVaultSession` round-trips `issueVaultSession` email and service, and returns undefined for a garbage cookie.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `yarn test:server server/utils/vault.test.ts`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `server/utils/vault.ts`**
+- [x] **Step 3: Implement `server/utils/vault.ts`**
 
 Core logic (full file in repo conventions):
 
@@ -110,12 +110,12 @@ export async function routeVaultSignIn(ctx, service, email): Promise<VaultOutcom
 
 Cookie: `ctx.cookies.set(VAULT_COOKIE, token, { httpOnly: true, sameSite: "lax", secure: env.isProduction, expires: +10m, domain: parseDomain(env.URL).host })`. Token: `JWT.sign({ email, service, type: "vault", createdAt, expiresAt }, env.SECRET_KEY)`; verify with `JWT.verify` plus `type === "vault"` and `expiresAt` checks, try/catch to undefined. Also export `clearVaultSessionCookie` (expired, same domain) and a `resetVaultModeCache()` test helper.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `yarn test:server server/utils/vault.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/utils/vault.ts server/utils/vault.test.ts
@@ -139,7 +139,7 @@ git commit -m "feat: add vault session and membership routing utilities"
 - Consumes Task 1: `isVaultMode`, `isVaultRequest`.
 - Produces: auth.config response contract used by Task 5 client (`vault`, `accessEmail`, `workspaceNotFound`, gated `name`).
 
-- [ ] **Step 1: Write the failing auth.config tests**
+- [x] **Step 1: Write the failing auth.config tests**
 
 Add to `server/routes/api/auth/auth.test.ts` (follow existing fetch style in that file):
 1. Apex host with two subdomained teams, unauthenticated: `data.vault === true`, `data.name === undefined`, `data.providers` non-empty, `data.accessEmail` equals env value when set.
@@ -147,12 +147,12 @@ Add to `server/routes/api/auth/auth.test.ts` (follow existing fetch style in tha
 3. Unknown subdomain host in vault mode: `data.workspaceNotFound === true` and no `name`.
 4. Apex host with one team whose subdomain is null: legacy behavior, `data.vault` undefined and `data.name` present (regression guard).
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `yarn test:server server/routes/api/auth/auth.test.ts`
 Expected: FAIL on the new cases.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `server/utils/authentication.ts`, top of `signIn` after destructuring:
 
@@ -189,12 +189,12 @@ else if (domain.teamSubdomain) {
 - apex fallback branch: `if (!env.isCloudHosted) { if (await isVaultMode()) { const unknown = !!parseDomain(ctx.request.hostname).teamSubdomain; ctx.body = { data: { providers: ..., vault: !unknown, workspaceNotFound: unknown || undefined, accessEmail: env.VAULT_ACCESS_EMAIL } }; return; } ...legacy... }`.
 - `server/env.ts`: `public VAULT_ACCESS_EMAIL = environment.VAULT_ACCESS_EMAIL ?? "";` with JSDoc.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `yarn test:server server/routes/api/auth/auth.test.ts`
 Expected: PASS including regression cases.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "feat: make the apex a neutral vault host and gate tenant branding"
@@ -213,7 +213,7 @@ git commit -m "feat: make the apex a neutral vault host and gate tenant branding
 - Consumes Task 1: `verifyVaultSession`; `server/middlewares/authentication` with `{ optional: true }` for session callers.
 - Produces for Tasks 5 and 6: `POST /api/vault.workspaces` → `{ data: { email, workspaces: Array<{ id, name, avatarUrl, url, slug }> } }`; `POST /api/vault.transfer` body `{ teamId }` → `{ data: { url } }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Cases:
 1. `vault.workspaces` without vault cookie or token: 401.
@@ -224,12 +224,12 @@ Cases:
 6. `vault.transfer` authenticated by a normal tenant session (build user, sign in via test helper) for another team of the same email: 200 (switcher path).
 7. `vault.transfer` for a team whose `domain` (custom) is set: 403.
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `yarn test:server server/routes/api/vault/vault.test.ts`
 Expected: FAIL, 404 route missing.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `vault.ts` sketch (full code in repo conventions, JSDoc on router handlers not required but schema zod objects yes):
 
@@ -258,12 +258,12 @@ router.post("vault.transfer", rateLimiter(RateLimiterStrategy.TenPerMinute), aut
 
 `resolveVaultEmail`: `verifyVaultSession(ctx)?.email ?? (ctx.state.auth?.user?.email if not suspended)`. Use the existing `rateLimiter` middleware and `RateLimiterStrategy` enum exactly as other API routes do (copy an existing usage, e.g. in `server/routes/api/auth/auth.ts` or `urls.ts`).
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `yarn test:server server/routes/api/vault/vault.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "feat: add vault.workspaces and vault.transfer endpoints"
@@ -284,7 +284,7 @@ git commit -m "feat: add vault.workspaces and vault.transfer endpoints"
 - Consumes Task 1 `isVaultRequest`, `routeVaultSignIn`; Task 2 `AuthenticationResult.vaultRedirect`.
 - Produces: apex sign-ins never provision; single membership hands off via existing signIn transfer path.
 
-- [ ] **Step 1: Middleware change**
+- [x] **Step 1: Middleware change**
 
 In `server/middlewares/passport.ts` success callback, before any `!user` handling:
 
@@ -294,7 +294,7 @@ if (result?.vaultRedirect) {
 }
 ```
 
-- [ ] **Step 2: Google and Azure insertion**
+- [x] **Step 2: Google and Azure insertion**
 
 In each verify callback, immediately after the verified email is available and before `getTeamFromContext`/provisioning:
 
@@ -310,7 +310,7 @@ if (await isVaultRequest(context)) {
 
 For azure use its verified email field (`profile.email ?? profile.upn`, lowercased) matching how the plugin already derives email for provisioning.
 
-- [ ] **Step 3: Email plugin insertion**
+- [x] **Step 3: Email plugin insertion**
 
 In the magic-link callback route, after the token email is verified and before `accountProvisioner`:
 
@@ -326,16 +326,16 @@ if (await isVaultRequest(ctx)) {
 
 Keep the existing `auth.email` send route unchanged (it only mails a token; no membership leak).
 
-- [ ] **Step 4: Typecheck and lint**
+- [x] **Step 4: Typecheck and lint**
 
 Run: `yarn tsc && yarn lint`
 Expected: clean.
 
-- [ ] **Step 5: Manual checklist (record in commit body)**
+- [x] **Step 5: Manual checklist (record in commit body)**
 
 Local multi-tenant smoke: two teams with subdomains; apex Google sign-in with an email in both lands on selector; email in one redirects straight to that tenant; unknown email lands on no-access; tenant subdomain sign-in unchanged; single-team-no-subdomain install unchanged.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "feat: route apex sign-ins through the vault router in auth providers"
@@ -358,24 +358,24 @@ git commit -m "feat: route apex sign-ins through the vault router in auth provid
 - Consumes: `POST /api/vault.workspaces`, `POST /api/vault.transfer` (Task 3); `config.vault` (Task 2); existing `AuthenticationProvider` component and AuthStore email-link request method for the three buttons.
 - Produces: complete apex experience for states sign-in, selector, redirect, no-access, error, plus `workspaceNotFound` state reused by unknown tenant subdomains in `Login.tsx`.
 
-- [ ] **Step 1: Fonts**
+- [x] **Step 1: Fonts**
 
 Download Manrope 400,500,600,700,800 and JetBrains Mono 400,500 woff2 (latin subset) into `public/fonts/`, add `@font-face` rules with `font-display: swap` to the app global stylesheet, commit binaries.
 
-- [ ] **Step 2: Failing component test for WorkspaceFinder**
+- [x] **Step 2: Failing component test for WorkspaceFinder**
 
 Render with testing-library (follow an existing app component test): typing `Bad Slug!` and submitting shows the invalid-input helper string from spec 4.1; typing `programming` and submitting shows `Opening programming.docs.tin.info` and does not call fetch.
 
-- [ ] **Step 3: Implement components**
+- [x] **Step 3: Implement components**
 
 Markup and interactions mirror `design/tin-vault-launchpad/option-a-signal-gate.html`; all strings via `t()` from spec section 4. `theme.ts` holds the palette tokens from spec 2.1 as a typed object consumed by styled-components in this scene only. `AuthCard` reuses `AuthenticationProvider` for provider buttons and the AuthStore email-link request for the email step; adds the returning-visitor shortcut button reading the `sessions` cookie via `getCookie("sessions")` (tiny-cookie, same as `useLoggedInSessions`) and rendering `Continue to <name>` when present. `WorkspaceSelector` uses `useVaultWorkspaces` (POST vault.workspaces, loading skeletons, error state) and on row click POSTs `vault.transfer` then `window.location.href = data.url`. `VaultStatus` covers redirect (spinner + `Continue manually` re-issuing the last handoff url), no-access (mailto `config.accessEmail`), and error states. `Login.tsx`: after config resolves, `if (config?.vault) return <Launchpad />;` and `if (config?.workspaceNotFound) return <WorkspaceNotFound />;` (small local component with spec 7 copy: heading `Workspace not found`, body `We could not find a workspace at this address, or you do not have access to it. Use the Launchpad to reach your workspaces.`, primary `Go to Launchpad` linking to the base origin).
 
-- [ ] **Step 4: Run tests, typecheck, lint**
+- [x] **Step 4: Run tests, typecheck, lint**
 
 Run: `yarn test:app app/scenes/Launchpad && yarn tsc && yarn lint`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "feat: add the TIN Vault Launchpad scene at the apex"
@@ -395,11 +395,11 @@ git commit -m "feat: add the TIN Vault Launchpad scene at the apex"
 - Consumes: `stores.auth.availableTeams` (already returned by auth.info), `AuthStore.transferToTeam`.
 - Produces: menu per `design/tin-vault-launchpad/switcher-concept.html`: current row with check, `Your workspaces` list, `Launchpad, all workspaces` (base origin), `Sign in to another workspace` (clears sessions hint cookie then base origin).
 
-- [ ] **Step 1: Implement menu component**
+- [x] **Step 1: Implement menu component**
 
 Popover anchored to the sidebar team button; keyboard accessible (Escape closes, arrows move); rows call `transferToTeam` then navigate; current team row is not a link. Strings via `t()` from spec 4.7. Visibility: only when `availableTeams.length > 1`.
 
-- [ ] **Step 2: Wire AuthStore.transferToTeam**
+- [x] **Step 2: Wire AuthStore.transferToTeam**
 
 ```ts
 @action
@@ -409,16 +409,16 @@ transferToTeam = async (teamId: string): Promise<string> => {
 };
 ```
 
-- [ ] **Step 3: Typecheck and lint**
+- [x] **Step 3: Typecheck and lint**
 
 Run: `yarn tsc && yarn lint`
 Expected: clean.
 
-- [ ] **Step 4: Manual checklist (commit body)**
+- [x] **Step 4: Manual checklist (commit body)**
 
 Switch tenant A to B and back without re-login; menu lists only memberships; command-bar "Switch workspace" still works and shows the same set.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "feat: add sidebar workspace switcher with transfer-token handoff"
@@ -433,25 +433,25 @@ git commit -m "feat: add sidebar workspace switcher with transfer-token handoff"
 - Create: `server/routes/api/vault/` addition `vault.logout` (clears httpOnly vault cookie) if Sign out cannot clear it client-side
 - Modify: locale JSON only via extraction output
 
-- [ ] **Step 1: Logout semantics**
+- [x] **Step 1: Logout semantics**
 
 Root `Sign out`: POST `vault.logout` (server clears `vaultSession`), then remove `sessions` and `lastSignedIn` cookies client-side on the base domain. `Switch account`: same plus force the provider chooser (no OIDC auto-redirect at apex, already true because multiple providers).
 
-- [ ] **Step 2: Extraction**
+- [x] **Step 2: Extraction**
 
 Run: `yarn build:i18n`
 Inspect `git diff shared/i18n`; commit locale changes together with the code commit if the diff is limited to new Launchpad strings.
 
-- [ ] **Step 3: Full verification**
+- [x] **Step 3: Full verification**
 
 Run: `yarn tsc && yarn lint && yarn test:server server/utils/vault.test.ts server/routes/api/vault/vault.test.ts server/routes/api/auth/auth.test.ts && yarn test:app app/scenes/Launchpad`
 Expected: all green.
 
-- [ ] **Step 4: Reduced-motion and contrast audit**
+- [x] **Step 4: Reduced-motion and contrast audit**
 
 Check Launchpad styled-components for the `prefers-reduced-motion` guard and AA contrast on the orange primary button (white on `#E8591F`) and helper text on white; fix inline.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "chore: launchpad logout semantics, i18n extraction and audits"
