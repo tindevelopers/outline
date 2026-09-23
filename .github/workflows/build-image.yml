@@ -138,8 +138,7 @@ jobs:
             echo "CRITICAL_ALERTS_WEBHOOK_URL not set, skipping notification"
             exit 0
           fi
+          text="🔴 Build and publish image failed on \`${GITHUB_REF_NAME}\` (${GITHUB_SHA::7}): ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           curl -sf -X POST "$WEBHOOK_URL" \
             -H "content-type: application/json" \
-            -d "$(printf '{"text":"🔴 Build and publish image failed on `%s` (%s): %s"}' \
-              "${GITHUB_REF_NAME}" "${GITHUB_SHA::7}" \
-              "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")"
+            -d "$(printf '{"text":"%s"}' "$text")"
