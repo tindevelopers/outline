@@ -82,13 +82,6 @@ const Panel = styled.section`
     gap: 14px;
   }
 
-  .vault {
-    font-family: ${vaultTheme.fontMono};
-    font-size: 12px;
-    letter-spacing: 0.24em;
-    color: #b7c3d3;
-  }
-
   .copy {
     display: flex;
     flex-direction: column;
@@ -210,7 +203,6 @@ export function BrandPanel() {
 
       <div className="top">
         <TinMark size={64} />
-        <span className="vault">VAULT</span>
       </div>
 
       <div className="copy">
