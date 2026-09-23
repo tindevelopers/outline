@@ -87,7 +87,8 @@ export class Environment {
    */
   @IsOptional()
   @IsEmail()
-  public VAULT_ACCESS_EMAIL = environment.VAULT_ACCESS_EMAIL ?? "";
+  public VAULT_ACCESS_EMAIL: string | undefined =
+    environment.VAULT_ACCESS_EMAIL || undefined;
 
   /**
    * The url of the database.

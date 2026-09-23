@@ -1,5 +1,6 @@
 import * as React from "react";
-import styled from "styled-components";
+import styled, { ThemeProvider, useTheme } from "styled-components";
+import type { DefaultTheme } from "styled-components";
 import type { Config } from "~/stores/AuthStore";
 import { useVaultWorkspaces } from "~/hooks/useVaultWorkspaces";
 import { vaultTheme } from "./theme";
@@ -97,6 +98,15 @@ type Props = {
  */
 export function Launchpad({ config }: Props) {
   const vault = useVaultWorkspaces();
+  const theme = useTheme();
+
+  // Buttons inside the Launchpad use the TIN orange at a shade that keeps
+  // white label text at WCAG AA (4.5:1), unlike the decorative accent.
+  const vaultAccentTheme: DefaultTheme = {
+    ...theme,
+    accent: vaultTheme.orange600,
+    accentText: "#ffffff",
+  };
 
   let card: React.ReactNode;
 
@@ -139,10 +149,12 @@ export function Launchpad({ config }: Props) {
   }
 
   return (
-    <Shell>
-      <BrandPanel />
-      <Pane>{card}</Pane>
-    </Shell>
+    <ThemeProvider theme={vaultAccentTheme}>
+      <Shell>
+        <BrandPanel />
+        <Pane>{card}</Pane>
+      </Shell>
+    </ThemeProvider>
   );
 }
 
