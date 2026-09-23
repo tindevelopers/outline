@@ -42,6 +42,12 @@ export type Config = {
   customTheme?: Partial<CustomTheme>;
   hostname?: string;
   providers: Provider[];
+  /** True when this host is the neutral vault entry point. */
+  vault?: boolean;
+  /** Contact address for requesting workspace access. */
+  accessEmail?: string;
+  /** True when the tenant subdomain is unknown or inaccessible. */
+  workspaceNotFound?: boolean;
 };
 
 export default class AuthStore extends Store<Team> {
@@ -284,6 +290,20 @@ export default class AuthStore extends Store<Team> {
   };
 
   requestDeleteUser = () => client.post(`/users.requestDelete`);
+
+  /**
+   * Mints a transfer handoff URL for another workspace the user is a member
+   * of, so switching never logs the current workspace out.
+   *
+   * @param teamId The id of the workspace to enter.
+   * @returns The tenant URL carrying a short-lived transfer token.
+   */
+  transferToTeam = async (teamId: string): Promise<string> => {
+    const res: { url: string } = await client.post("/vault.transfer", {
+      teamId,
+    });
+    return res.url;
+  };
 
   requestDeleteTeam = () => client.post(`/teams.requestDelete`);
 

@@ -21,6 +21,7 @@ import {
   startOAuthFlow,
   withProxyAgent,
 } from "@server/utils/passport";
+import { isVaultRequest, routeVaultSignIn } from "@server/utils/vault";
 import config from "../../plugin.json";
 import env from "../env";
 import { createContext } from "@server/context";
@@ -142,6 +143,28 @@ if (env.AZURE_CLIENT_ID && env.AZURE_CLIENT_SECRET) {
           throw MicrosoftGraphError(
             "'email' property is required but could not be found in user profile."
           );
+        }
+
+        // Vault entry point: the apex authenticates the identity and routes by
+        // membership instead of resolving or provisioning a team.
+        if (await isVaultRequest(context)) {
+          const outcome = await routeVaultSignIn(
+            context,
+            config.id,
+            email.toLowerCase()
+          );
+
+          if (outcome.kind === "single") {
+            return done(null, outcome.user, {
+              user: outcome.user,
+              team: outcome.team,
+              client: getClientFromOAuthState(context),
+              isNewTeam: false,
+              isNewUser: false,
+            });
+          }
+
+          return done(null, null, { vaultRedirect: "/" });
         }
 
         const team = await getTeamFromContext(context);

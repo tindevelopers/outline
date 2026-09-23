@@ -47,9 +47,17 @@ import type {
 
 export { AuthenticationType } from "@shared/types";
 
-export type AuthenticationResult = AccountProvisionerResult & {
-  client: Client;
-};
+export type AuthenticationResult =
+  | (AccountProvisionerResult & { client: Client })
+  | {
+      /**
+       * Set by the vault router when the sign-in resolved to a client-side
+       * state (workspace selector or no access) instead of a team session.
+       * signIn() then only performs the redirect; no session cookie is set.
+       */
+      vaultRedirect: string;
+      client?: Client;
+    };
 
 export type Authentication = {
   /** The user associated with this session. */

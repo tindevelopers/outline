@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TIN Vault, in-app workspace switcher concept</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      /* In-app switcher concept: Outline chrome mock with the workspace menu
+         open, plus design notes on the patterns borrowed and adapted. */
+      .wrap {
+        min-height: 100dvh;
+        padding: 40px 24px 120px;
+        display: grid;
+        grid-template-columns: minmax(0, 760px) minmax(0, 380px);
+        gap: 32px;
+        justify-content: center;
+        align-items: start;
+      }
+
+      .intro h1 {
+        font-size: 26px;
+        color: var(--tin-navy-800);
+      }
+
+      .intro p {
+        margin: 8px 0 24px;
+        max-width: 60ch;
+        font-size: 14.5px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .frame {
+        border: 1px solid var(--line);
+        border-radius: var(--r-surface);
+        background: #ffffff;
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+      }
+
+      .chrome {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        background: #fbfcfd;
+      }
+
+      .chrome .dots {
+        display: flex;
+        gap: 6px;
+      }
+
+      .chrome .dots i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #dfe6ec;
+      }
+
+      .chrome .url {
+        flex: 1;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        color: var(--muted);
+        background: #f1f4f7;
+        border-radius: 999px;
+        padding: 5px 12px;
+      }
+
+      .app {
+        position: relative;
+        display: grid;
+        grid-template-columns: 232px minmax(0, 1fr);
+        min-height: 460px;
+      }
+
+      .side {
+        border-right: 1px solid var(--line);
+        padding: 14px 10px;
+        background: #fbfcfd;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .ws-btn {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 8px;
+        border: 1px solid transparent;
+        border-radius: var(--r-ctrl);
+        background: transparent;
+        cursor: pointer;
+        font-family: var(--font-display);
+        text-align: left;
+      }
+
+      .ws-btn:hover {
+        background: rgba(53, 73, 107, 0.06);
+      }
+
+      .ws-btn[aria-expanded="true"] {
+        background: rgba(53, 73, 107, 0.08);
+        border-color: var(--line);
+      }
+
+      .ws-btn .ws-tile {
+        width: 30px;
+        height: 30px;
+        font-size: 13px;
+        border-radius: 8px;
+      }
+
+      .ws-btn .ws-name {
+        font-size: 14px;
+      }
+
+      .ws-btn .chev {
+        margin-left: auto;
+        color: var(--muted);
+      }
+
+      .side .nav-line {
+        height: 12px;
+        border-radius: 6px;
+        background: #e6ebf0;
+        margin: 8px 10px;
+      }
+
+      .side .nav-line.short {
+        width: 60%;
+      }
+
+      .side .spacer {
+        flex: 1;
+      }
+
+      .side .me {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+
+      .side .me i {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #c9d4df;
+      }
+
+      .doc {
+        padding: 34px 40px;
+      }
+
+      .doc .t {
+        width: 46%;
+        height: 18px;
+        border-radius: 8px;
+        background: #35496b;
+        opacity: 0.8;
+        margin-bottom: 18px;
+      }
+
+      .doc .l {
+        height: 9px;
+        border-radius: 5px;
+        background: #e6ebf0;
+        margin-bottom: 12px;
+      }
+
+      /* The switcher menu */
+      .menu {
+        position: absolute;
+        left: 240px;
+        top: 52px;
+        width: 300px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-surface);
+        background: #ffffff;
+        box-shadow: var(--shadow-pop);
+        padding: 8px;
+        z-index: 5;
+      }
+
+      .menu .cur {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        border-radius: var(--r-ctrl);
+        background: rgba(53, 73, 107, 0.05);
+      }
+
+      .menu .cur .ws-tile {
+        width: 34px;
+        height: 34px;
+        font-size: 14px;
+      }
+
+      .menu .cur .ws-name {
+        font-size: 14px;
+      }
+
+      .menu .cur .tick {
+        margin-left: auto;
+        color: var(--tin-orange);
+      }
+
+      .menu .sec {
+        padding: 10px 10px 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .menu .item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: var(--r-ctrl);
+        background: transparent;
+        cursor: pointer;
+        font-family: var(--font-display);
+        text-align: left;
+      }
+
+      .menu .item:hover {
+        background: rgba(53, 73, 107, 0.07);
+      }
+
+      .menu .item .ws-tile {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+        border-radius: 7px;
+      }
+
+      .menu .item .ws-name {
+        font-size: 13.5px;
+      }
+
+      .menu .item .ws-slug {
+        font-size: 11px;
+      }
+
+      .menu hr {
+        border: 0;
+        border-top: 1px solid var(--line);
+        margin: 6px 4px;
+      }
+
+      .menu .item.plain {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+        gap: 8px;
+      }
+
+      .notes {
+        border: 1px solid var(--line);
+        border-radius: var(--r-surface);
+        background: #ffffff;
+        padding: 22px;
+        box-shadow: var(--shadow-card);
+      }
+
+      .notes h2 {
+        font-size: 17px;
+        color: var(--tin-navy-800);
+      }
+
+      .notes ul {
+        margin: 14px 0 0;
+        padding-left: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 13.5px;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+
+      .notes b {
+        color: var(--ink);
+      }
+
+      .kbd {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 5px;
+        padding: 1px 5px;
+        background: #f5f8fa;
+        color: var(--ink);
+      }
+
+      @media (max-width: 1080px) {
+        .wrap {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .menu {
+          left: 236px;
+        }
+      }
+    </style>
+  </head>
+  <body data-state="login">
+    <div class="proto-bar" role="toolbar" aria-label="Prototype notes">
+      <span class="proto-label">Switcher concept</span>
+      <button aria-pressed="true" onclick="return false">Menu open (default)</button>
+    </div>
+
+    <div class="wrap">
+      <div class="intro">
+        <h1>In-app workspace switcher</h1>
+        <p>
+          Lives at the top of the Outline sidebar on every tenant subdomain. The list is the same
+          membership-filtered set the Launchpad selector shows, fetched from the authenticated
+          session. Switching hands off with a transfer token, so no logout and no re-auth.
+        </p>
+
+        <div class="frame">
+          <div class="chrome">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span class="url">programming.docs.tin.info</span>
+            <span style="width: 46px"></span>
+          </div>
+          <div class="app">
+            <aside class="side">
+              <button class="ws-btn" type="button" aria-expanded="true">
+                <span class="ws-tile" style="background: #27395a">P</span>
+                <span class="ws-name">Programming</span>
+                <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              <div class="nav-line"></div>
+              <div class="nav-line short"></div>
+              <div class="nav-line"></div>
+              <div class="nav-line short"></div>
+              <div class="spacer"></div>
+              <div class="me"><i></i> mira@tin.info</div>
+            </aside>
+
+            <div class="doc" aria-hidden="true">
+              <div class="t"></div>
+              <div class="l" style="width: 88%"></div>
+              <div class="l" style="width: 76%"></div>
+              <div class="l" style="width: 82%"></div>
+              <div class="l" style="width: 58%"></div>
+            </div>
+
+            <div class="menu" role="menu" aria-label="Workspaces">
+              <div class="cur">
+                <span class="ws-tile" style="background: #27395a">P</span>
+                <span class="ws-meta">
+                  <span class="ws-name">Programming</span>
+                  <span class="ws-slug">current workspace</span>
+                </span>
+                <svg class="tick" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 13 4 4 10-11" /></svg>
+              </div>
+
+              <p class="sec">Your workspaces</p>
+              <button class="item" type="button" role="menuitem">
+                <span class="ws-tile" style="background: #35496b">T</span>
+                <span class="ws-meta">
+                  <span class="ws-name">TIN</span>
+                  <span class="ws-slug">tin.docs.tin.info</span>
+                </span>
+              </button>
+              <button class="item" type="button" role="menuitem">
+                <span class="ws-tile" style="background: #1b2c45">C</span>
+                <span class="ws-meta">
+                  <span class="ws-name">Clients</span>
+                  <span class="ws-slug">clients.docs.tin.info</span>
+                </span>
+              </button>
+
+              <hr />
+              <button class="item plain" type="button" role="menuitem">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h18M12 3v18" /></svg>
+                Launchpad, all workspaces
+              </button>
+              <button class="item plain" type="button" role="menuitem">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+                Sign in to another workspace
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <h2>Patterns borrowed, adapted to TIN</h2>
+        <ul>
+          <li><b>Slack:</b> workspace identity pinned at the top of the sidebar with a menu. We keep the position, drop the channel-style density.</li>
+          <li><b>Linear and Notion:</b> the switcher lists only workspaces you belong to, each with its own mark. Ours adds the tenant URL in mono so clients can verify where they are.</li>
+          <li><b>Atlassian:</b> a clear "current" row with a check, so the menu never feels like a logout screen.</li>
+          <li><b>Keyboard path:</b> the fork already ships a "Switch workspace" command bar action. It becomes a child of this same menu data, reachable with <span class="kbd">Cmd</span> <span class="kbd">K</span>.</li>
+          <li><b>TIN rule:</b> switching never logs you out of the workspace you left. Each tenant keeps its own host-scoped session; the handoff mints a transfer token for the target tenant only.</li>
+          <li><b>TIN rule:</b> the menu and the Launchpad selector read from one source, the authenticated membership list. Nothing is cached publicly or pre-auth.</li>
+        </ul>
+      </aside>
+    </div>
+  </body>
+</html>

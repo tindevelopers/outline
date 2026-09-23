@@ -40,8 +40,17 @@ export function getSessionsInCookie(ctx: Context) {
 export async function signIn(
   ctx: Context | APIContext,
   service: string,
-  { user, team, client, isNewTeam }: AuthenticationResult
+  result: AuthenticationResult
 ) {
+  // The vault router resolved this sign-in to a client-side state (workspace
+  // selector or no access) instead of a team session; the vault cookie was
+  // already set by the router, so only the redirect is left to do.
+  if ("vaultRedirect" in result) {
+    ctx.redirect(result.vaultRedirect);
+    return;
+  }
+
+  const { user, team, client, isNewTeam } = result;
   const { transaction } = ctx.state;
 
   if (team.isSuspended) {
@@ -119,10 +128,11 @@ export async function signIn(
     domain,
   });
 
-  // On cloud hosted multi-team deployments, record the signed-in team in the
-  // sessions cookie so the web team switcher stays in sync. This applies to
-  // both web and desktop clients.
-  if (env.isCloudHosted && team.subdomain) {
+  // On multi-team deployments (cloud hosted, or self-hosted with tenant
+  // subdomains), record the signed-in team in the sessions cookie so the web
+  // team switcher and the vault Launchpad stay in sync. This applies to both
+  // web and desktop clients.
+  if (team.subdomain) {
     // get any existing sessions (teams signed in) and add this team
     const existing = getSessionsInCookie(ctx);
     const sessions = encodeURIComponent(

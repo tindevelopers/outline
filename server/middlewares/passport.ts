@@ -115,6 +115,12 @@ export default function createMiddleware(providerName: string) {
           return ctx.redirect(`/?notice=auth-error`);
         }
 
+        // The vault router resolved the sign-in to a client-side state; the
+        // vault cookie is set and only the redirect remains.
+        if (result && "vaultRedirect" in result) {
+          return ctx.redirect(result.vaultRedirect);
+        }
+
         // Passport.js may invoke this callback with err=null and user=null in
         // the event that error=access_denied is received from the OAuth server.
         // I'm not sure why this exception to the rule exists, but it does:

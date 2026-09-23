@@ -21,6 +21,7 @@ import { hash, safeEqual } from "./crypto";
 import fetch from "./fetch";
 import { getUserForJWT } from "./jwt";
 import { parseUserInfoResponse } from "./oauth";
+import { isVaultMode } from "./vault";
 import {
   hashOAuthStateNonce,
   signOAuthIntent,
@@ -377,7 +378,9 @@ export async function getTeamFromContext(
 
   // Fallback for single-team / unsubdomained self-hosted installs: the previous
   // behaviour of routing everything to the latest (only) team is preserved.
-  if (!team && !env.isCloudHosted) {
+  // In vault mode the apex is a neutral entry point and unknown tenant
+  // subdomains must not leak the fallback team, so neither falls back.
+  if (!team && !env.isCloudHosted && !(await isVaultMode())) {
     if (env.ENVIRONMENT === "test") {
       team = await Team.findByDomain(env.URL);
     } else {

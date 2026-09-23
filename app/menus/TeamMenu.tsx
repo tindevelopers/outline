@@ -9,6 +9,8 @@ import {
   createTeam,
   switchTeamsList,
   desktopLoginTeam,
+  goToLaunchpad,
+  signInToAnotherWorkspace,
 } from "~/actions/definitions/teams";
 import useActionContext from "~/hooks/useActionContext";
 import { DropdownMenu } from "~/components/Menu/DropdownMenu";
@@ -30,6 +32,9 @@ const TeamMenu: React.FC<Props> = ({ children }: Props) => {
       ...switchTeamsList(context),
       createTeam,
       desktopLoginTeam,
+      ActionSeparator,
+      goToLaunchpad,
+      signInToAnotherWorkspace,
       ActionSeparator,
       navigateToWorkspaceSettings,
       logout,

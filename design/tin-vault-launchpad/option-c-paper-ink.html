@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TIN Vault Launchpad, Option C: Paper and Ink</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      /* Option C: Paper and Ink. Light editorial surface, left-aligned column,
+         document-stack illustration, rows instead of cards. */
+      .sheet {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        background:
+          linear-gradient(180deg, #ffffff 0%, var(--bg) 340px);
+      }
+
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 26px 48px;
+      }
+
+      .top .host {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .main {
+        flex: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+        gap: 48px;
+        align-items: center;
+        width: 100%;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 12px 48px 120px;
+      }
+
+      .copy h1 {
+        font-size: clamp(30px, 3.6vw, 44px);
+        line-height: 1.1;
+        color: var(--tin-navy-800);
+      }
+
+      .copy .sub {
+        margin: 14px 0 30px;
+        max-width: 44ch;
+        font-size: 15.5px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .rows {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .rows .btn {
+        justify-content: flex-start;
+        text-align: left;
+      }
+
+      .divider {
+        margin: 18px 0;
+      }
+
+      .ws-box {
+        margin-top: 22px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-surface);
+        background: #ffffff;
+      }
+
+      .ws-box .ws-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 10px;
+      }
+
+      .foot-line {
+        margin-top: 22px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .foot-line a {
+        color: var(--tin-navy);
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .foot-line a:hover {
+        text-decoration: underline;
+      }
+
+      .art {
+        display: flex;
+        justify-content: center;
+      }
+
+      .art svg {
+        width: min(460px, 100%);
+        height: auto;
+      }
+
+      /* Selector rows: divided list, no cards */
+      .plain-list {
+        margin: 26px 0 0;
+        padding: 0;
+        list-style: none;
+        border-top: 1px solid var(--line);
+      }
+
+      .plain-list .ws-row {
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        background: transparent;
+        padding: 16px 6px;
+      }
+
+      .plain-list .ws-row:hover {
+        box-shadow: none;
+        background: rgba(53, 73, 107, 0.04);
+      }
+
+      .copy h2 {
+        font-size: 26px;
+        color: var(--tin-navy-800);
+      }
+
+      .copy .lead {
+        margin: 10px 0 0;
+        max-width: 46ch;
+        font-size: 14.5px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 22px;
+        max-width: 320px;
+      }
+
+      .bottom {
+        border-top: 1px solid var(--line);
+        padding: 18px 48px;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 940px) {
+        .top,
+        .main,
+        .bottom {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+
+        .main {
+          grid-template-columns: 1fr;
+          gap: 28px;
+          padding-top: 4px;
+        }
+
+        .art {
+          order: -1;
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body data-state="login">
+    <div class="proto-bar" role="toolbar" aria-label="Prototype states">
+      <span class="proto-label">Option C states</span>
+      <button data-state="login" aria-pressed="true">Sign in</button>
+      <button data-state="selector" aria-pressed="false">Selector</button>
+      <button data-state="redirect" aria-pressed="false">Redirecting</button>
+      <button data-state="noaccess" aria-pressed="false">No access</button>
+      <button data-state="error" aria-pressed="false">Error</button>
+    </div>
+
+    <div class="sheet">
+      <header class="top">
+        <div class="tin-mark">
+          <svg width="42" height="27" viewBox="0 0 170 110" fill="none" aria-hidden="true">
+            <g class="mark-letters" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M32 28 V86 Q32 100 46 100 H54" />
+              <path d="M20 52 H56" />
+              <path d="M85 62 V100" />
+              <path d="M118 100 V74 Q118 60 133 60 Q150 60 150 76 V100" />
+            </g>
+            <circle class="mark-dot" cx="85" cy="42" r="9" />
+            <g class="mark-signal" stroke-width="7" stroke-linecap="round">
+              <path d="M89.1 26.5 A16 16 0 0 1 100.5 37.9" />
+              <path d="M91.7 16.8 A26 26 0 0 1 110.2 35.3" />
+              <path d="M94.3 7.1 A36 36 0 0 1 119.9 32.6" />
+            </g>
+          </svg>
+          <span class="tin-word">tin<span class="vault">VAULT</span></span>
+        </div>
+        <span class="host">docs.tin.info</span>
+      </header>
+
+      <main class="main">
+        <div class="copy">
+          <!-- Sign in -->
+          <div class="state state-login">
+            <h1 class="rise">Sign in to TIN Vault.</h1>
+            <p class="sub rise rise-1">
+              One identity for every team and client workspace. Your memberships decide where you
+              can go.
+            </p>
+
+            <div class="rows rise rise-2">
+              <button class="btn" type="button">
+                <svg width="18" height="18" viewBox="0 0 23 23" aria-hidden="true">
+                  <rect width="11" height="11" fill="#F25022" />
+                  <rect x="12" width="11" height="11" fill="#7FBA00" />
+                  <rect y="12" width="11" height="11" fill="#00A4EF" />
+                  <rect x="12" y="12" width="11" height="11" fill="#FFB900" />
+                </svg>
+                Continue with Microsoft
+              </button>
+              <button class="btn" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#EA4335" d="M12 5.04c1.62 0 3.06.56 4.2 1.66l3.13-3.13C17.45 1.79 14.97.75 12 .75 7.7.75 3.99 3.22 2.18 6.83l3.66 2.84C6.71 7.03 9.14 5.04 12 5.04z" />
+                  <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.55-.2-2.28H12v4.51h6.47c-.28 1.48-1.12 2.73-2.38 3.58l3.7 2.87c2.16-2 3.7-4.94 3.7-8.68z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09L2.18 7.07C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
+                  <path fill="#34A853" d="M12 23.25c3.04 0 5.6-1 7.47-2.72l-3.7-2.87c-1.02.69-2.34 1.1-3.77 1.1-2.86 0-5.29-1.93-6.16-4.53l-3.66 2.84c1.81 3.61 5.52 6.18 9.82 6.18z" />
+                </svg>
+                Continue with Google
+              </button>
+              <button class="btn" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2" />
+                  <path d="m3 7 9 6 9-6" />
+                </svg>
+                Continue with Email
+              </button>
+            </div>
+
+            <form class="ws-box ws-form rise rise-3">
+              <p class="ws-title">Know your workspace?</p>
+              <div class="input-row">
+                <label for="slug-c" style="position:absolute;left:-9999px">Workspace</label>
+                <input id="slug-c" name="slug" placeholder="e.g. programming" autocomplete="off" spellcheck="false" />
+                <button class="btn btn-primary" type="submit">Go</button>
+              </div>
+              <p class="helper ws-note">
+                Goes straight to that workspace sign-in. Nothing is suggested, listed or searched.
+              </p>
+            </form>
+
+            <p class="foot-line">Need access? <a href="#">Contact your TIN administrator</a>.</p>
+          </div>
+
+          <!-- Selector -->
+          <div class="state state-selector">
+            <h2 class="rise">Choose a workspace</h2>
+            <p class="lead rise rise-1">
+              Signed in as mira@tin.info. Only workspaces where you hold membership appear here.
+            </p>
+            <ul class="plain-list rise rise-2">
+              <li>
+                <button class="ws-row" type="button">
+                  <span class="ws-tile" style="background: #35496b">T</span>
+                  <span class="ws-meta">
+                    <span class="ws-name">TIN</span>
+                    <span class="ws-slug">tin.docs.tin.info</span>
+                  </span>
+                  <svg class="ws-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                </button>
+              </li>
+              <li>
+                <button class="ws-row" type="button">
+                  <span class="ws-tile" style="background: #46608c">P</span>
+                  <span class="ws-meta">
+                    <span class="ws-name">Programming</span>
+                    <span class="ws-slug">programming.docs.tin.info</span>
+                  </span>
+                  <svg class="ws-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                </button>
+              </li>
+              <li>
+                <button class="ws-row" type="button">
+                  <span class="ws-tile" style="background: #27395a">C</span>
+                  <span class="ws-meta">
+                    <span class="ws-name">Clients</span>
+                    <span class="ws-slug">clients.docs.tin.info</span>
+                  </span>
+                  <svg class="ws-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                </button>
+              </li>
+            </ul>
+            <p class="foot-line"><a href="#">Sign out</a> or <a href="#">switch account</a>.</p>
+          </div>
+
+          <!-- Redirect -->
+          <div class="state state-redirect">
+            <h2 class="rise">Taking you to Programming</h2>
+            <p class="lead mono rise rise-1">programming.docs.tin.info</p>
+            <p class="lead rise rise-1">Your only workspace. Signing you in now.</p>
+            <div class="stack rise rise-2">
+              <div class="spin" role="status" aria-label="Redirecting"></div>
+              <button class="btn btn-ghost" type="button">Continue manually</button>
+            </div>
+          </div>
+
+          <!-- No access -->
+          <div class="state state-noaccess">
+            <h2 class="rise">No workspaces yet</h2>
+            <p class="lead rise rise-1">
+              You are signed in as guest@partner.com. That account is not a member of any TIN
+              Vault workspace. A workspace administrator can grant access.
+            </p>
+            <div class="stack rise rise-2">
+              <button class="btn btn-primary" type="button">Request access</button>
+              <button class="btn btn-ghost" type="button">Sign out</button>
+            </div>
+          </div>
+
+          <!-- Error -->
+          <div class="state state-error">
+            <h2 class="rise">We could not complete that sign-in</h2>
+            <p class="lead rise rise-1">
+              The identity provider did not confirm your session. This is usually temporary and
+              your credentials were not stored.
+            </p>
+            <div class="stack rise rise-2">
+              <button class="btn btn-primary" type="button">Try again</button>
+              <button class="btn btn-ghost" type="button">Contact support</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="art" aria-hidden="true">
+          <svg viewBox="0 0 460 420" fill="none">
+            <rect x="70" y="60" width="280" height="330" rx="14" fill="#ffffff" stroke="#e2e8ef" />
+            <rect x="100" y="104" width="150" height="12" rx="6" fill="#35496b" opacity="0.85" />
+            <rect x="100" y="136" width="220" height="8" rx="4" fill="#c9d4df" />
+            <rect x="100" y="156" width="200" height="8" rx="4" fill="#c9d4df" />
+            <rect x="100" y="176" width="210" height="8" rx="4" fill="#c9d4df" />
+            <rect x="100" y="216" width="90" height="8" rx="4" fill="#e8591f" opacity="0.85" />
+            <rect x="100" y="244" width="220" height="8" rx="4" fill="#e2e8ef" />
+            <rect x="100" y="264" width="180" height="8" rx="4" fill="#e2e8ef" />
+            <rect x="120" y="26" width="280" height="330" rx="14" fill="#f5f8fa" stroke="#e2e8ef" />
+            <rect x="150" y="70" width="130" height="12" rx="6" fill="#35496b" opacity="0.55" />
+            <rect x="150" y="102" width="200" height="8" rx="4" fill="#d7dfe7" />
+            <rect x="150" y="122" width="180" height="8" rx="4" fill="#d7dfe7" />
+            <rect x="170" y="-6" width="280" height="330" rx="14" fill="#ffffff" stroke="#e2e8ef" />
+            <rect x="200" y="38" width="120" height="12" rx="6" fill="#35496b" opacity="0.35" />
+            <rect x="200" y="70" width="190" height="8" rx="4" fill="#e2e8ef" />
+            <rect x="200" y="90" width="170" height="8" rx="4" fill="#e2e8ef" />
+            <circle cx="404" cy="352" r="34" fill="#e8591f" />
+            <path d="M392 352 l8 9 l16 -18" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+      </main>
+
+      <footer class="bottom">
+        <span>Tenant-isolated workspaces. Single sign-on. Audited access.</span>
+        <span>docs.tin.info</span>
+      </footer>
+    </div>
+
+    <script>
+      const bar = document.querySelector(".proto-bar");
+      bar.addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-state]");
+        if (!b) return;
+        document.body.dataset.state = b.dataset.state;
+        bar.querySelectorAll("button[data-state]").forEach((x) =>
+          x.setAttribute("aria-pressed", String(x === b))
+        );
+      });
+
+      document.querySelectorAll(".ws-form").forEach((form) => {
+        form.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const note = form.querySelector(".ws-note");
+          const raw = form.querySelector("input").value.trim().toLowerCase();
+          if (!/^[a-z0-9-]{1,63}$/.test(raw)) {
+            note.textContent = "Use the workspace name from your invite, letters and dashes only.";
+            return;
+          }
+          note.textContent = "Opening " + raw + ".docs.tin.info";
+        });
+      });
+    </script>
+  </body>
+</html>
