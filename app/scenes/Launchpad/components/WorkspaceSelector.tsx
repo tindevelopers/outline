@@ -6,37 +6,28 @@ import type { VaultWorkspace } from "~/hooks/useVaultWorkspaces";
 import { requestVaultTransfer, signOutOfVault } from "~/hooks/useVaultWorkspaces";
 import { vaultTheme } from "../theme";
 
-const Card = styled.div`
-  width: 100%;
-  max-width: 432px;
-  padding: 34px 34px 28px;
-  background: ${vaultTheme.card};
-  border: 1px solid ${vaultTheme.line};
-  border-radius: ${vaultTheme.radiusSurface};
-  box-shadow: ${vaultTheme.shadowCard};
-
+const Copy = styled.div`
   h2 {
     margin: 0;
     font-family: ${vaultTheme.fontDisplay};
-    font-size: 24px;
+    font-size: 26px;
     letter-spacing: -0.02em;
-    color: ${vaultTheme.ink};
+    color: ${vaultTheme.navy800};
   }
 
   .lead {
-    margin: 8px 0 22px;
+    margin: 10px 0 0;
+    max-width: 46ch;
     font-size: 14.5px;
-    line-height: 1.55;
+    line-height: 1.6;
     color: ${vaultTheme.muted};
   }
 
   ul {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin: 0;
+    margin: 26px 0 0;
     padding: 0;
     list-style: none;
+    border-top: 1px solid ${vaultTheme.line};
   }
 
   .row {
@@ -44,19 +35,17 @@ const Card = styled.div`
     align-items: center;
     gap: 14px;
     width: 100%;
-    padding: 12px 14px;
-    border-radius: ${vaultTheme.radiusCtrl};
-    border: 1px solid ${vaultTheme.line};
-    background: ${vaultTheme.card};
+    padding: 16px 6px;
+    border: 0;
+    border-bottom: 1px solid ${vaultTheme.line};
+    background: transparent;
     cursor: pointer;
     text-align: left;
     font-family: ${vaultTheme.fontDisplay};
-    transition: border-color 0.16s ease, box-shadow 0.16s ease,
-      transform 0.12s ease;
+    transition: background-color 0.16s ease;
 
     &:hover {
-      border-color: #c3cfdb;
-      box-shadow: 0 3px 14px rgba(16, 32, 54, 0.1);
+      background: rgba(53, 73, 107, 0.04);
 
       .arrow {
         transform: translateX(3px);
@@ -66,6 +55,11 @@ const Card = styled.div`
 
     &:active {
       transform: translateY(1px);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
     }
   }
 
@@ -110,14 +104,10 @@ const Card = styled.div`
     transition: transform 0.16s ease, color 0.16s ease;
   }
 
-  .foot {
-    margin-top: 20px;
-    padding-top: 16px;
-    border-top: 1px solid ${vaultTheme.line};
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
+  .foot-line {
+    margin-top: 22px;
     font-size: 13px;
+    color: ${vaultTheme.muted};
   }
 
   .linkbtn {
@@ -133,10 +123,6 @@ const Card = styled.div`
       text-decoration: underline;
     }
   }
-
-  @media (max-width: 880px) {
-    padding: 26px 20px 22px;
-  }
 `;
 
 type Props = {
@@ -147,10 +133,10 @@ type Props = {
 };
 
 /**
- * The authenticated workspace selector: only the caller's memberships, each
- * entering its tenant through a transfer-token handoff.
+ * The authenticated workspace selector as divided rows: only the caller's
+ * memberships, each entering its tenant through a transfer-token handoff.
  *
- * @returns The selector card.
+ * @returns The selector column.
  */
 export function WorkspaceSelector({ email, workspaces }: Props) {
   const { t } = useTranslation();
@@ -172,12 +158,13 @@ export function WorkspaceSelector({ email, workspaces }: Props) {
   };
 
   return (
-    <Card>
+    <Copy>
       <h2>{t("Choose a workspace")}</h2>
       <p className="lead">
-        {t("Signed in as {{ email }}. You are a member of these workspaces.", {
-          email,
-        })}
+        {t(
+          "Signed in as {{ email }}. Only workspaces where you hold membership appear here.",
+          { email }
+        )}
       </p>
 
       <ul>
@@ -191,11 +178,7 @@ export function WorkspaceSelector({ email, workspaces }: Props) {
             >
               <span
                 className="tile"
-                style={{
-                  background: workspace.avatarUrl
-                    ? vaultTheme.navy
-                    : stringToColor(workspace.id),
-                }}
+                style={{ background: stringToColor(workspace.id) }}
               >
                 {workspace.name.charAt(0).toUpperCase()}
               </span>
@@ -220,14 +203,24 @@ export function WorkspaceSelector({ email, workspaces }: Props) {
         ))}
       </ul>
 
-      <div className="foot">
-        <button className="linkbtn" type="button" onClick={() => void handleSignOut()}>
+      <p className="foot-line">
+        <button
+          className="linkbtn"
+          type="button"
+          onClick={() => void handleSignOut()}
+        >
           {t("Sign out")}
+        </button>{" "}
+        {t("or")}{" "}
+        <button
+          className="linkbtn"
+          type="button"
+          onClick={() => void handleSignOut()}
+        >
+          {t("switch account")}
         </button>
-        <button className="linkbtn" type="button" onClick={() => void handleSignOut()}>
-          {t("Switch account")}
-        </button>
-      </div>
-    </Card>
+        .
+      </p>
+    </Copy>
   );
 }

@@ -25,7 +25,13 @@ experience, the Launchpad, that:
 Non-goals for v1: marketing content on the root, workspace creation from the root,
 cross-email identity merging, per-tenant theming of the Launchpad.
 
-## 2. Design direction: Signal Gate (Option A)
+## 2. Design direction: Paper and Ink (Option C, approved switch)
+
+Supersedes the earlier Signal Gate selection. Implemented layout: light
+editorial sheet with a top bar (TIN lockup left, host right), a left-aligned
+content column, a document-stack illustration on the right (hidden below
+940px) and a hairline footer bar. Tokens, motion and accessibility rules
+below are unchanged.
 
 Reading: enterprise SaaS authentication portal and workspace launcher for internal teams
 and external clients. Trust-first, premium, minimal. Dials: variance 5, motion 3,
@@ -51,20 +57,21 @@ density 3.
 
 ### 2.2 Layout, desktop
 
-Split screen, `minmax(380px, 44fr) 56fr`, full viewport height.
+Single light sheet, `linear-gradient(180deg, #ffffff, #f5f8fa 340px)`, full viewport
+height, content grid `minmax(0, 560px) minmax(0, 1fr)` capped at 1180px.
 
-- Left brand panel: deep navy gradient, TIN mark and wordmark top-left, headline and
-  one supporting sentence centered vertically, oversized signal-arc motif bottom-right
-  at 14 percent opacity, one micro-line at the bottom naming `docs.tin.info` as the
-  single entry point.
-- Right pane: light background, one white card (max width 432px) holding the auth
-  stack. Card contents per state, section 4.
+- Top bar: TIN lockup left, current host in mono right.
+- Content column: headline, one sub-line, provider buttons as full-width left-aligned
+  rows, the workspace finder in a bordered white box, one footer line.
+- Right column: document-stack illustration with a single orange seal, decorative.
+- Selector and terminal states render as left-aligned copy with hairline-divided
+  rows, no cards.
 
 ### 2.3 Layout, mobile
 
-Below 880px the split collapses to a column: compact brand band (mark, headline, no
-micro-line, arcs hidden), then the card full-width with 16px gutters. The prototype
-control pill is prototype-only and ships nowhere.
+Below 940px the grid collapses to one column, gutters tighten to 20px and the
+illustration is hidden. The prototype control pill is prototype-only and ships
+nowhere.
 
 ### 2.4 Accessibility
 

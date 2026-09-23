@@ -1,48 +1,66 @@
 import * as React from "react";
 import styled, { ThemeProvider, useTheme } from "styled-components";
 import type { DefaultTheme } from "styled-components";
+import { useTranslation } from "react-i18next";
 import type { Config } from "~/stores/AuthStore";
 import { useVaultWorkspaces } from "~/hooks/useVaultWorkspaces";
 import { vaultTheme } from "./theme";
 import { AuthCard } from "./components/AuthCard";
-import { BrandPanel } from "./components/BrandPanel";
+import { DocArt } from "./components/DocArt";
+import { TopBar } from "./components/TopBar";
 import { VaultStatus } from "./components/VaultStatus";
 import { WorkspaceSelector } from "./components/WorkspaceSelector";
 
-const Shell = styled.main`
-  display: grid;
-  grid-template-columns: minmax(380px, 44fr) 56fr;
+const Sheet = styled.main`
   min-height: 100dvh;
-  background: ${vaultTheme.bg};
-  font-family: ${vaultTheme.fontDisplay};
-
-  @media (max-width: 880px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const Pane = styled.section`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px 96px;
-
-  @media (max-width: 880px) {
-    padding: 32px 16px 110px;
-  }
-`;
-
-const SkeletonCard = styled.div`
-  width: 100%;
-  max-width: 432px;
-  padding: 34px;
-  background: ${vaultTheme.card};
-  border: 1px solid ${vaultTheme.line};
-  border-radius: ${vaultTheme.radiusSurface};
-  box-shadow: ${vaultTheme.shadowCard};
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, ${vaultTheme.bg} 340px);
+  font-family: ${vaultTheme.fontDisplay};
+`;
+
+const Main = styled.div`
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  gap: 48px;
+  align-items: center;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 12px 48px 120px;
+
+  @media (max-width: 940px) {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 4px 20px 120px;
+  }
+`;
+
+const Foot = styled.footer`
+  border-top: 1px solid ${vaultTheme.line};
+  padding: 18px 48px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12.5px;
+  color: ${vaultTheme.muted};
+
+  .host {
+    font-family: ${vaultTheme.fontMono};
+  }
+
+  @media (max-width: 940px) {
+    padding: 18px 20px;
+  }
+`;
+
+const Skeleton = styled.div`
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 
   .skel {
     position: relative;
@@ -67,8 +85,8 @@ const SkeletonCard = styled.div`
   }
 
   .skel.title {
-    height: 24px;
-    width: 40%;
+    height: 40px;
+    width: 60%;
   }
 
   @keyframes vault-shimmer {
@@ -91,12 +109,13 @@ type Props = {
 
 /**
  * The TIN Vault Launchpad: the apex authentication and workspace launch
- * experience. Renders sign-in, the membership selector, the single-workspace
- * handoff and the terminal states.
+ * experience in the Paper and Ink direction. Renders sign-in, the membership
+ * selector, the single-workspace handoff and the terminal states.
  *
  * @returns The Launchpad scene.
  */
 export function Launchpad({ config }: Props) {
+  const { t } = useTranslation();
   const vault = useVaultWorkspaces();
   const theme = useTheme();
 
@@ -108,18 +127,20 @@ export function Launchpad({ config }: Props) {
     accentText: "#ffffff",
   };
 
+  const host = config.hostname ?? window.location.host;
+
   let card: React.ReactNode;
 
   if (config.workspaceNotFound) {
     card = <VaultStatus kind="notfound" />;
   } else if (vault.status === "loading") {
     card = (
-      <SkeletonCard aria-busy="true">
+      <Skeleton aria-busy="true">
         <div className="skel title" />
         <div className="skel" />
         <div className="skel" />
         <div className="skel" />
-      </SkeletonCard>
+      </Skeleton>
     );
   } else if (vault.status === "error") {
     card = <VaultStatus kind="error" />;
@@ -133,15 +154,10 @@ export function Launchpad({ config }: Props) {
         />
       );
     } else if (vault.workspaces.length === 1) {
-      card = (
-        <VaultStatus kind="redirect" workspace={vault.workspaces[0]} />
-      );
+      card = <VaultStatus kind="redirect" workspace={vault.workspaces[0]} />;
     } else {
       card = (
-        <WorkspaceSelector
-          email={vault.email}
-          workspaces={vault.workspaces}
-        />
+        <WorkspaceSelector email={vault.email} workspaces={vault.workspaces} />
       );
     }
   } else {
@@ -150,10 +166,19 @@ export function Launchpad({ config }: Props) {
 
   return (
     <ThemeProvider theme={vaultAccentTheme}>
-      <Shell>
-        <BrandPanel />
-        <Pane>{card}</Pane>
-      </Shell>
+      <Sheet>
+        <TopBar host={host} />
+        <Main>
+          <div>{card}</div>
+          <DocArt />
+        </Main>
+        <Foot>
+          <span>
+            {t("Tenant-isolated workspaces. Single sign-on. Audited access.")}
+          </span>
+          <span className="host">{host}</span>
+        </Foot>
+      </Sheet>
     </ThemeProvider>
   );
 }

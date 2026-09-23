@@ -8,60 +8,44 @@ import AuthenticationProvider from "~/scenes/Login/components/AuthenticationProv
 import { vaultTheme } from "../theme";
 import { WorkspaceFinder } from "./WorkspaceFinder";
 
-const Card = styled.div`
-  width: 100%;
-  max-width: 432px;
-  padding: 34px 34px 28px;
-  background: ${vaultTheme.card};
-  border: 1px solid ${vaultTheme.line};
-  border-radius: ${vaultTheme.radiusSurface};
-  box-shadow: ${vaultTheme.shadowCard};
-
-  h2 {
+const Copy = styled.div`
+  h1 {
     margin: 0;
     font-family: ${vaultTheme.fontDisplay};
-    font-size: 24px;
+    font-size: clamp(30px, 3.6vw, 44px);
+    line-height: 1.1;
     letter-spacing: -0.02em;
-    color: ${vaultTheme.ink};
+    color: ${vaultTheme.navy800};
   }
 
-  .lead {
-    margin: 8px 0 22px;
-    font-size: 14.5px;
-    line-height: 1.55;
+  .sub {
+    margin: 14px 0 30px;
+    max-width: 44ch;
+    font-size: 15.5px;
+    line-height: 1.6;
     color: ${vaultTheme.muted};
   }
 
-  .stack {
+  .rows {
     display: flex;
     flex-direction: column;
     gap: 10px;
-  }
 
-  .divider {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 18px 0;
-    color: ${vaultTheme.muted};
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-
-    &::before,
-    &::after {
-      content: "";
-      flex: 1;
-      height: 1px;
-      background: ${vaultTheme.line};
+    /* Provider buttons render as left-aligned rows, not centered pills. */
+    button {
+      justify-content: flex-start;
+      text-align: left;
     }
   }
 
-  .foot {
-    margin-top: 20px;
-    padding-top: 16px;
-    border-top: 1px solid ${vaultTheme.line};
+  .sent {
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: ${vaultTheme.muted};
+  }
+
+  .foot-line {
+    margin-top: 22px;
     font-size: 13px;
     color: ${vaultTheme.muted};
 
@@ -74,16 +58,6 @@ const Card = styled.div`
         text-decoration: underline;
       }
     }
-  }
-
-  .sent {
-    margin: 10px 0 0;
-    font-size: 13px;
-    color: ${vaultTheme.muted};
-  }
-
-  @media (max-width: 880px) {
-    padding: 26px 20px 22px;
   }
 `;
 
@@ -108,10 +82,10 @@ type Props = {
 };
 
 /**
- * The authenticated-entry card: provider buttons, email step, the workspace
- * finder and the returning-visitor shortcut.
+ * The Launchpad sign-in column: headline, provider rows, email step and the
+ * workspace finder, in the Paper and Ink editorial layout.
  *
- * @returns The card element.
+ * @returns The column element.
  */
 export function AuthCard({ config }: Props) {
   const { t } = useTranslation();
@@ -120,26 +94,26 @@ export function AuthCard({ config }: Props) {
   const lastHint = Object.values(hints)[0];
 
   return (
-    <Card>
-      <h2>{t("Sign in")}</h2>
-      <p className="lead">
-        {t("Use your TIN identity. Your workspaces follow your account.")}
+    <Copy>
+      <h1>{t("Sign in to TIN Vault.")}</h1>
+      <p className="sub">
+        {t(
+          "One identity for every team and client workspace. Your memberships decide where you can go."
+        )}
       </p>
 
-      {lastHint ? (
-        <div className="stack" style={{ marginBottom: 14 }}>
+      <div className="rows">
+        {lastHint ? (
           <Button
             neutral
+            style={{ width: "100%" }}
             onClick={() => {
               window.location.href = lastHint.url;
             }}
           >
             {t("Continue to {{ name }}", { name: lastHint.name })}
           </Button>
-        </div>
-      ) : null}
-
-      <div className="stack">
+        ) : null}
         {config.providers.map((provider) => (
           <AuthenticationProvider
             key={provider.id}
@@ -161,23 +135,21 @@ export function AuthCard({ config }: Props) {
         </p>
       ) : null}
 
-      <div className="divider">{t("know your workspace?")}</div>
-
       <WorkspaceFinder title={t("Know your workspace?")} />
 
-      <div className="foot">
+      <p className="foot-line">
         {config.accessEmail ? (
-          <span>
+          <>
             {t("Need access?")}{" "}
             <a href={`mailto:${config.accessEmail}`}>
               {t("Contact your TIN administrator")}
             </a>
             .
-          </span>
+          </>
         ) : (
-          <span>{t("Need access? Contact your TIN administrator.")}</span>
+          t("Need access? Contact your TIN administrator.")
         )}
-      </div>
-    </Card>
+      </p>
+    </Copy>
   );
 }

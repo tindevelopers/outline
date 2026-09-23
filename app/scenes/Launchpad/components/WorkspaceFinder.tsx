@@ -6,6 +6,19 @@ import { isValidWorkspaceSlug, tenantOriginFor } from "../urls";
 import { vaultTheme } from "../theme";
 
 const Box = styled.div`
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid ${vaultTheme.line};
+  border-radius: ${vaultTheme.radiusSurface};
+  background: ${vaultTheme.card};
+
+  .ws-title {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 700;
+    color: ${vaultTheme.ink};
+  }
+
   .input-row {
     display: flex;
     gap: 8px;
@@ -84,8 +97,12 @@ export function WorkspaceFinder({ title }: Props) {
   return (
     <Box>
       <form onSubmit={handleSubmit}>
+        <p className="ws-title">{title}</p>
         <div className="input-row">
-          <label htmlFor="vault-workspace-finder" style={{ position: "absolute", left: "-9999px" }}>
+          <label
+            htmlFor="vault-workspace-finder"
+            style={{ position: "absolute", left: "-9999px" }}
+          >
             {title}
           </label>
           <input
