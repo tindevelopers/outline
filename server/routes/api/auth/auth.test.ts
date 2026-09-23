@@ -353,6 +353,30 @@ describe("#auth.config (vault mode)", () => {
     spy.mockRestore();
   });
 
+  it("offers email at the apex when any workspace enables email sign-in", async () => {
+    await buildTeam({ subdomain: slug(), guestSignin: true });
+    const spy = vi.spyOn(Team, "count").mockImplementation(async (options) => {
+      const where = options?.where;
+      if (
+        typeof where === "object" &&
+        where !== null &&
+        "guestSignin" in where
+      ) {
+        return 1;
+      }
+      return where ? 0 : 2;
+    });
+
+    const res = await server.post("/api/auth.config", {
+      headers: { host: parseDomain(env.URL).host },
+    });
+    const body = await res.json();
+
+    expect(body.data.vault).toBe(true);
+    expect(body.data.providers.map((provider: { id: string }) => provider.id)).toContain("email");
+    spy.mockRestore();
+  });
+
   it("gates tenant name behind PublicBranding", async () => {
     const team = await buildTeam({ subdomain: slug() });
     const host = `${team.subdomain}.${getBaseDomain()}`;

@@ -110,13 +110,22 @@ router.post("auth.config", async (ctx: APIContext<T.AuthConfigReq>) => {
     // In vault mode the apex is the neutral Launchpad: no team branding, and
     // the client learns it must render the vault experience.
     if (await isVaultMode()) {
+      // Email sign-in has no passport provider and no single team at the
+      // apex, so it is offered when any workspace enables it; the vault
+      // email flow then routes by membership on callback.
+      const includeEmail =
+        env.EMAIL_ENABLED &&
+        (await Team.count({ where: { guestSignin: true } })) > 0;
+
       ctx.body = {
         data: {
           vault: true,
           accessEmail: env.VAULT_ACCESS_EMAIL || undefined,
-          providers: (await AuthenticationHelper.providersForTeam()).map(
-            presentProviderConfig
-          ),
+          providers: (
+            await AuthenticationHelper.providersForTeam(undefined, {
+              includeEmail,
+            })
+          ).map(presentProviderConfig),
         },
       };
       return;

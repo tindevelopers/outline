@@ -37,7 +37,10 @@ export default class AuthenticationHelper {
    * @param team The team to get enabled providers for
    * @returns A promise resolving to a list of authentication providers
    */
-  public static async providersForTeam(team?: Team) {
+  public static async providersForTeam(
+    team?: Team,
+    options?: { includeEmail?: boolean }
+  ) {
     const isCloudHosted = env.isCloudHosted;
 
     // Only check passkeys count if the team has passkeys enabled, to avoid
@@ -64,7 +67,7 @@ export default class AuthenticationHelper {
         // Email sign-in is an exception as it does not have an authentication
         // provider using passport, instead it exists as a boolean option.
         if (hook.value.id === "email") {
-          return team?.emailSigninEnabled;
+          return options?.includeEmail ?? !!team?.emailSigninEnabled;
         }
 
         // Passkeys is an exception as it does not have an authentication

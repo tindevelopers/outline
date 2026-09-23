@@ -127,6 +127,12 @@ export function AuthCard({ config }: Props) {
         ))}
       </div>
 
+      {config.providers.length === 0 ? (
+        <p className="sent">
+          {t("No sign-in methods are configured for this installation yet.")}
+        </p>
+      ) : null}
+
       {emailSentTo ? (
         <p className="sent">
           {t("A sign-in link is on its way to {{ email }}.", {
