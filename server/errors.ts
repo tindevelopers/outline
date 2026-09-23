@@ -231,6 +231,23 @@ export function OIDCMalformedUserInfoError(
   });
 }
 
+/**
+ * Raised when an identity provider signs a user in without confirming that
+ * they own the email address, so the address cannot be trusted to route them
+ * to any workspace.
+ *
+ * @param message the error message.
+ * @returns the HTTP error.
+ */
+export function EmailUnverifiedError(
+  message = "The identity provider did not verify this email address"
+) {
+  return httpErrors(403, message, {
+    id: "email_unverified",
+    isReportable: false,
+  });
+}
+
 export function AuthenticationProviderDisabledError(
   message = "Authentication method has been disabled by an admin",
   redirectPath = "/"

@@ -320,6 +320,21 @@ async function validateAuthentication(
       }
     }
 
+    // The vault apex is identity-only and never hosts a workspace, so a
+    // workspace session cookie there (e.g. from before vault mode) must not
+    // load the app. API keys and OAuth tokens arrive in the header and are
+    // unaffected. Imported at runtime because this module loads during model
+    // registration.
+    if (transport === "cookie" && ctx.hostname) {
+      const { isVaultRequest } = await import("@server/utils/vault");
+
+      if (await isVaultRequest(ctx)) {
+        throw AuthenticationError(
+          "Workspace sessions are not valid on the vault entry point"
+        );
+      }
+    }
+
     type = AuthenticationType.APP;
     const result = await getUserForJWT(token);
     user = result.user;

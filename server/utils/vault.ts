@@ -91,7 +91,9 @@ export function issueVaultSession(email: string, service: string): string {
 }
 
 /**
- * Sets the apex-scoped vault session cookie on the response.
+ * Sets the vault session cookie on the response. The cookie is host-only on
+ * the apex: tenant subdomains never need the identity, they receive their own
+ * session through a transfer token.
  *
  * @param ctx The Koa context.
  * @param email The verified email address of the signer.
@@ -108,7 +110,6 @@ export function setVaultSessionCookie(
     sameSite: "lax",
     secure: env.isProduction,
     expires: addMinutes(new Date(), VAULT_TTL_MINUTES),
-    domain: parseDomain(env.URL).host,
   });
 }
 
@@ -124,7 +125,6 @@ export function clearVaultSessionCookie(ctx: Context): void {
     sameSite: "lax",
     secure: env.isProduction,
     expires: addMinutes(new Date(), -1),
-    domain: parseDomain(env.URL).host,
   });
 }
 
@@ -209,6 +209,50 @@ export function verifyVaultEmailToken(token: string): string | undefined {
 }
 
 /**
+ * Resolves the workspace a sign-in was started from. Provider callbacks
+ * always land on the apex, so the host captured in the verified OAuth state
+ * is the only record of which tenant the user asked for.
+ *
+ * @param ctx The Koa context.
+ * @returns The requested team, or undefined when the sign-in began on the apex.
+ */
+export async function getRequestedVaultTeam(
+  ctx: Context
+): Promise<Team | undefined> {
+  const host: unknown = ctx.state?.oauthState?.host;
+
+  if (typeof host !== "string") {
+    return undefined;
+  }
+
+  const { teamSubdomain } = parseDomain(host);
+
+  if (!teamSubdomain) {
+    return undefined;
+  }
+
+  return (await Team.findBySubdomain(teamSubdomain)) ?? undefined;
+}
+
+/**
+ * Reports whether an OAuth callback should be routed by the vault. Provider
+ * callbacks always land on the apex, so the apex hostname alone cannot tell
+ * an apex sign-in from one started on a tenant. Sign-ins started on an
+ * existing tenant use the regular team flow, which enforces membership,
+ * invitations and allowed domains for that tenant only.
+ *
+ * @param ctx The Koa context of the provider callback.
+ * @returns true when the sign-in began on the apex, or on an unknown tenant.
+ */
+export async function isVaultSignIn(ctx: Context): Promise<boolean> {
+  if (!(await isVaultRequest(ctx))) {
+    return false;
+  }
+
+  return !(await getRequestedVaultTeam(ctx));
+}
+
+/**
  * Routes an authenticated apex sign-in by membership without provisioning
  * anything. One live membership resolves to that team's user row so the
  * caller can hand off through the existing transfer-token flow; zero or
@@ -238,7 +282,5 @@ export async function routeVaultSignIn(
   }
 
   setVaultSessionCookie(ctx, email, service);
-  return live.length > 1
-    ? { kind: "choice", email }
-    : { kind: "none", email };
+  return live.length > 1 ? { kind: "choice", email } : { kind: "none", email };
 }

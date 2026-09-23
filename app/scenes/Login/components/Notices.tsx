@@ -49,6 +49,14 @@ function Message({ notice }: { notice: string }) {
           installation. Try another?
         </Trans>
       );
+    case "email-unverified":
+      return (
+        <Trans>
+          Your identity provider did not confirm that you own this email
+          address, so we could not match it to a workspace. Sign in with an
+          account whose email is verified.
+        </Trans>
+      );
     case "malformed-user-info":
       return (
         <Trans>

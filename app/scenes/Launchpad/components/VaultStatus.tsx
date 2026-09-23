@@ -4,7 +4,10 @@ import styled from "styled-components";
 import { getBaseDomain } from "@shared/utils/domains";
 import Button from "~/components/Button";
 import type { VaultWorkspace } from "~/hooks/useVaultWorkspaces";
-import { requestVaultTransfer, signOutOfVault } from "~/hooks/useVaultWorkspaces";
+import {
+  requestVaultTransfer,
+  signOutOfVault,
+} from "~/hooks/useVaultWorkspaces";
 import { vaultTheme } from "../theme";
 
 const Copy = styled.div`
@@ -75,18 +78,29 @@ type Props =
 export function VaultStatus(props: Props) {
   const { t } = useTranslation();
   const handoff = React.useRef<string | null>(null);
+  const [handoffFailed, setHandoffFailed] = React.useState(false);
 
   const startHandoff = React.useCallback(async (workspace: VaultWorkspace) => {
-    const url = await requestVaultTransfer(workspace.id);
-    handoff.current = url;
-    window.location.href = url;
+    try {
+      const url = await requestVaultTransfer(workspace.id);
+      handoff.current = url;
+      window.location.href = url;
+    } catch (_err) {
+      setHandoffFailed(true);
+    }
   }, []);
+
+  // Keyed on the workspace id rather than the props object, which is new on
+  // every render and would re-request a transfer token each time.
+  const redirectWorkspaceId =
+    props.kind === "redirect" ? props.workspace.id : undefined;
 
   React.useEffect(() => {
     if (props.kind === "redirect") {
       void startHandoff(props.workspace);
     }
-  }, [props, startHandoff]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [redirectWorkspaceId, startHandoff]);
 
   const handleSignOut = async () => {
     await signOutOfVault();
@@ -97,17 +111,30 @@ export function VaultStatus(props: Props) {
     <Copy>
       {props.kind === "redirect" ? (
         <>
-          <h2>{t("Taking you to {{ name }}", { name: props.workspace.name })}</h2>
+          <h2>
+            {t("Taking you to {{ name }}", { name: props.workspace.name })}
+          </h2>
           <p className="lead mono">{props.workspace.slug}</p>
-          <p className="lead">{t("Your only workspace. Signing you in now.")}</p>
+          <p className="lead" role={handoffFailed ? "alert" : undefined}>
+            {handoffFailed
+              ? t("We could not open it automatically. Try again below.")
+              : t("Your only workspace. Signing you in now.")}
+          </p>
           <div className="stack">
-            <div className="spin" role="status" aria-label={t("Redirecting")} />
+            {handoffFailed ? null : (
+              <div
+                className="spin"
+                role="status"
+                aria-label={t("Redirecting")}
+              />
+            )}
             <Button
               neutral
               onClick={() => {
                 if (handoff.current) {
                   window.location.href = handoff.current;
                 } else {
+                  setHandoffFailed(false);
                   void startHandoff(props.workspace);
                 }
               }}

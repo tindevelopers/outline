@@ -9,7 +9,11 @@ import {
   buildApiKey,
   buildOAuthAuthentication,
 } from "@server/test/factories";
+import { getBaseDomain, parseDomain } from "@shared/utils/domains";
+import env from "@server/env";
+import { Team } from "@server/models";
 import { AuthenticationType } from "@server/types";
+import { resetVaultModeCache } from "@server/utils/vault";
 import auth from "./authentication";
 
 describe("Authentication middleware", () => {
@@ -310,6 +314,98 @@ describe("Authentication middleware", () => {
       vi.fn()
     );
     expect(state.auth.user.id).toEqual(user.id);
+  });
+
+  describe("on the vault apex", () => {
+    // Read at run time: the test setup configures env.URL after collection.
+    const apexHost = () => parseDomain(env.URL).host;
+
+    function mockVaultMode() {
+      return vi.spyOn(Team, "count").mockImplementation(async (options) => {
+        const filtered = !!options?.where;
+        return filtered ? 0 : 2;
+      });
+    }
+
+    beforeEach(() => {
+      resetVaultModeCache();
+    });
+
+    it("should reject a session cookie", async () => {
+      const spy = mockVaultMode();
+      const user = await buildUser();
+      const authMiddleware = auth();
+
+      await expect(
+        authMiddleware(
+          {
+            hostname: apexHost(),
+            request: {
+              // @ts-expect-error mock request
+              get: vi.fn(() => null),
+            },
+            // @ts-expect-error mock cookies
+            cookies: {
+              get: vi.fn(() => user.getSessionToken()),
+            },
+            state: {} as DefaultState,
+            cache: {},
+          },
+          vi.fn()
+        )
+      ).rejects.toThrow(
+        "Workspace sessions are not valid on the vault entry point"
+      );
+      spy.mockRestore();
+    });
+
+    it("should still accept a session token in the Authorization header", async () => {
+      const spy = mockVaultMode();
+      const state = {} as DefaultState;
+      const user = await buildUser();
+      const authMiddleware = auth();
+
+      await authMiddleware(
+        {
+          hostname: apexHost(),
+          // @ts-expect-error mock request
+          request: {
+            get: vi.fn(() => `Bearer ${user.getSessionToken()}`),
+          },
+          state,
+          cache: {},
+        },
+        vi.fn()
+      );
+      expect(state.auth.user.id).toEqual(user.id);
+      spy.mockRestore();
+    });
+
+    it("should accept a session cookie on a tenant subdomain", async () => {
+      const spy = mockVaultMode();
+      const state = {} as DefaultState;
+      const user = await buildUser();
+      const authMiddleware = auth();
+
+      await authMiddleware(
+        {
+          hostname: `tin.${getBaseDomain()}`,
+          request: {
+            // @ts-expect-error mock request
+            get: vi.fn(() => null),
+          },
+          // @ts-expect-error mock cookies
+          cookies: {
+            get: vi.fn(() => user.getSessionToken()),
+          },
+          state,
+          cache: {},
+        },
+        vi.fn()
+      );
+      expect(state.auth.user.id).toEqual(user.id);
+      spy.mockRestore();
+    });
   });
 
   it("should return error with session token as a GET param", async () => {

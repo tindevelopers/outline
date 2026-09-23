@@ -8,7 +8,7 @@ import { toError } from "@shared/utils/error";
 import { slugifyDomain } from "@shared/utils/domains";
 import { parseEmail } from "@shared/utils/email";
 import accountProvisioner from "@server/commands/accountProvisioner";
-import { MicrosoftGraphError } from "@server/errors";
+import { EmailUnverifiedError, MicrosoftGraphError } from "@server/errors";
 import passportMiddleware from "@server/middlewares/passport";
 import type { User } from "@server/models";
 import type { AuthenticationResult } from "@server/types";
@@ -21,7 +21,7 @@ import {
   startOAuthFlow,
   withProxyAgent,
 } from "@server/utils/passport";
-import { isVaultRequest, routeVaultSignIn } from "@server/utils/vault";
+import { isVaultSignIn, routeVaultSignIn } from "@server/utils/vault";
 import config from "../../plugin.json";
 import env from "../env";
 import { createContext } from "@server/context";
@@ -145,33 +145,6 @@ if (env.AZURE_CLIENT_ID && env.AZURE_CLIENT_SECRET) {
           );
         }
 
-        // Vault entry point: the apex authenticates the identity and routes by
-        // membership instead of resolving or provisioning a team.
-        if (await isVaultRequest(context)) {
-          const outcome = await routeVaultSignIn(
-            context,
-            config.id,
-            email.toLowerCase()
-          );
-
-          if (outcome.kind === "single") {
-            return done(null, outcome.user, {
-              user: outcome.user,
-              team: outcome.team,
-              client: getClientFromOAuthState(context),
-              isNewTeam: false,
-              isNewUser: false,
-            });
-          }
-
-          return done(null, null, { vaultRedirect: "/" });
-        }
-
-        const team = await getTeamFromContext(context);
-        const client = getClientFromOAuthState(context);
-        const user =
-          context.state?.auth?.user ?? (await getUserFromOAuthState(context));
-
         // The mail and userPrincipalName values come from the directory via the
         // Graph API and are owned by the organization, so an email sourced from
         // them is inherently trusted. Microsoft's mutable `email` token claim is
@@ -197,6 +170,40 @@ if (env.AZURE_CLIENT_ID && env.AZURE_CLIENT_SECRET) {
                 (claim) => claim === true || claim === "true"
               )
             : undefined);
+
+        // Vault entry point: the apex authenticates the identity and routes by
+        // membership instead of resolving or provisioning a team.
+        if (await isVaultSignIn(context)) {
+          // The vault grants access by email alone, so an address the
+          // provider has not confirmed would let anyone claim another
+          // person's memberships.
+          if (emailVerified !== true) {
+            throw EmailUnverifiedError();
+          }
+
+          const outcome = await routeVaultSignIn(
+            context,
+            config.id,
+            email.toLowerCase()
+          );
+
+          if (outcome.kind === "single") {
+            return done(null, outcome.user, {
+              user: outcome.user,
+              team: outcome.team,
+              client: getClientFromOAuthState(context),
+              isNewTeam: false,
+              isNewUser: false,
+            });
+          }
+
+          return done(null, null, { vaultRedirect: "/" });
+        }
+
+        const team = await getTeamFromContext(context);
+        const client = getClientFromOAuthState(context);
+        const user =
+          context.state?.auth?.user ?? (await getUserFromOAuthState(context));
 
         const domain = parseEmail(email).domain;
         const subdomain = slugifyDomain(domain);

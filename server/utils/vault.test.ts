@@ -7,6 +7,7 @@ import { buildTeam, buildUser } from "@server/test/factories";
 import {
   isVaultMode,
   isVaultRequest,
+  isVaultSignIn,
   issueVaultEmailToken,
   issueVaultSession,
   resetVaultModeCache,
@@ -16,20 +17,23 @@ import {
   verifyVaultSession,
 } from "./vault";
 
-function mockCtx(hostname: string) {
+function mockCtx(hostname: string, oauthStateHost?: string) {
   const store: Record<string, string> = {};
+  const options: Record<string, unknown> = {};
 
   const ctx = {
     hostname,
+    state: oauthStateHost ? { oauthState: { host: oauthStateHost } } : {},
     cookies: {
       get: (name: string) => store[name],
-      set: (name: string, value: string, _options?: unknown) => {
+      set: (name: string, value: string, opts?: unknown) => {
         store[name] = value;
+        options[name] = opts;
       },
     },
   } as unknown as Context;
 
-  return { ctx, store };
+  return { ctx, store, options };
 }
 
 const slug = () => randomUUID().split("-")[0];
@@ -92,6 +96,44 @@ describe("isVaultRequest", () => {
     const spy = mockVaultMode();
     const { ctx } = mockCtx("docs.example.org");
     expect(await isVaultRequest(ctx)).toBe(false);
+    spy.mockRestore();
+  });
+});
+
+describe("isVaultSignIn", () => {
+  function mockVaultMode() {
+    return vi.spyOn(Team, "count").mockImplementation(async (options) => {
+      const filtered = !!options?.where;
+      return filtered ? 0 : 2;
+    });
+  }
+
+  it("is true for a sign-in started on the apex", async () => {
+    const spy = mockVaultMode();
+    const { ctx } = mockCtx(apex(), apex());
+    expect(await isVaultSignIn(ctx)).toBe(true);
+    spy.mockRestore();
+  });
+
+  it("is false for a sign-in started on an existing tenant", async () => {
+    const team = await buildTeam({ subdomain: slug() });
+    const spy = mockVaultMode();
+    const { ctx } = mockCtx(apex(), `${team.subdomain}.${getBaseDomain()}`);
+    expect(await isVaultSignIn(ctx)).toBe(false);
+    spy.mockRestore();
+  });
+
+  it("is true for a sign-in started on an unknown tenant", async () => {
+    const spy = mockVaultMode();
+    const { ctx } = mockCtx(apex(), `${slug()}.${getBaseDomain()}`);
+    expect(await isVaultSignIn(ctx)).toBe(true);
+    spy.mockRestore();
+  });
+
+  it("is false off the apex", async () => {
+    const spy = mockVaultMode();
+    const { ctx } = mockCtx(`tin.${getBaseDomain()}`);
+    expect(await isVaultSignIn(ctx)).toBe(false);
     spy.mockRestore();
   });
 });
@@ -161,6 +203,13 @@ describe("vault session cookie", () => {
       service: "azure",
     });
     expect(store["vaultSession"]).toBeTruthy();
+  });
+
+  it("is host-only so tenant subdomains never receive it", () => {
+    const { ctx, options } = mockCtx(apex());
+    setVaultSessionCookie(ctx, "mira@tin.info", "azure");
+
+    expect(options["vaultSession"]).not.toHaveProperty("domain");
   });
 
   it("rejects garbage tokens", () => {

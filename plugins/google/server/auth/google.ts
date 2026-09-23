@@ -9,6 +9,7 @@ import { languages } from "@shared/i18n";
 import { slugifyDomain } from "@shared/utils/domains";
 import accountProvisioner from "@server/commands/accountProvisioner";
 import {
+  EmailUnverifiedError,
   GmailAccountCreationError,
   TeamDomainRequiredError,
 } from "@server/errors";
@@ -23,7 +24,7 @@ import {
   startOAuthFlow,
   withProxyAgent,
 } from "@server/utils/passport";
-import { isVaultRequest, routeVaultSignIn } from "@server/utils/vault";
+import { isVaultSignIn, routeVaultSignIn } from "@server/utils/vault";
 import config from "../../plugin.json";
 import env from "../env";
 import { createContext } from "@server/context";
@@ -41,6 +42,7 @@ type GoogleProfile = Profile & {
   _json: {
     hd?: string;
     locale?: string;
+    email_verified?: boolean;
   };
 };
 
@@ -74,7 +76,13 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
 
         // Vault entry point: the apex authenticates the identity and routes by
         // membership instead of resolving or provisioning a team.
-        if (await isVaultRequest(context)) {
+        if (await isVaultSignIn(context)) {
+          // The vault grants access by email alone, so only an address
+          // Google has confirmed may be used to route the sign-in.
+          if (profile._json.email_verified !== true) {
+            throw EmailUnverifiedError();
+          }
+
           const outcome = await routeVaultSignIn(
             context,
             config.id,
