@@ -119,7 +119,7 @@ export function WorkspaceFinder({ title }: Props) {
             <input
               id="vault-workspace-finder"
               name="slug"
-              placeholder={t("programming")}
+              placeholder={t("workspace")}
               autoComplete="off"
               spellCheck={false}
             />

@@ -214,22 +214,20 @@ export function BrandPanel() {
       </div>
 
       <div className="copy">
-        <span className="eyebrow">{t("THE INTELLIGENT NETWORK")}</span>
+        <span className="eyebrow">{t("TIN VAULT")}</span>
         <h2>
-          {t("One identity.")}
+          {t("Your team’s knowledge,")}
           <br />
-          {t("Every workspace.")}
+          {t("in one place.")}
         </h2>
         <p>
           {t(
-            "Your memberships decide where you can go. Nothing else is listed, suggested or searched."
+            "Docs, notes and decisions for every team, each in its own private workspace."
           )}
         </p>
       </div>
 
-      <span className="trust">
-        {t("Tenant-isolated · Single sign-on · Audited access")}
-      </span>
+      <span className="trust">{t("Private · Secure · Built for teams")}</span>
     </Panel>
   );
 }
