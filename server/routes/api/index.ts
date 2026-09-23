@@ -52,6 +52,7 @@ import templates from "./templates";
 import urls from "./urls";
 import userMemberships from "./userMemberships";
 import users from "./users";
+import vault from "./vault";
 import views from "./views";
 import accessRequests from "./accessRequests";
 
@@ -93,6 +94,7 @@ router.use("/", authenticationProviders.routes());
 router.use("/", batch.routes());
 router.use("/", events.routes());
 router.use("/", users.routes());
+router.use("/", vault.routes());
 router.use("/", collections.routes());
 router.use("/", comments.routes());
 router.use("/", documents.routes());
