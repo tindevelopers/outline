@@ -55,8 +55,11 @@ export function useVaultWorkspaces(): VaultState {
         if (!mounted) {
           return;
         }
+        // Both "no credentials" (401) and "credentials without vault access"
+        // (403) mean the visitor must sign in; anything else is a real fault.
+        const status = getStatus(err);
         setState(
-          getStatus(err) === 401
+          status === 401 || status === 403
             ? { status: "unauthenticated" }
             : { status: "error" }
         );
