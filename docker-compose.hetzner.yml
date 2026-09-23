@@ -84,6 +84,36 @@ services:
       - caddy-config:/config
     logging: *logging
 
+  mattermost-relay:
+    # Translates Outline's signed webhook payloads into Mattermost Incoming
+    # Webhook messages. See deploy/mattermost-relay/server.js for the format
+    # mismatch this bridges and the signature verification it performs.
+    build: ./deploy/mattermost-relay
+    restart: unless-stopped
+    environment:
+      # Only per-workspace webhook secrets and the shared Mattermost URL are
+      # passed through - not the full .env - since this container doesn't
+      # need database credentials or app secrets. Add one line here and one
+      # entry to deploy/mattermost-relay/server.js's TEAMS map per workspace.
+      OUTLINE_WEBHOOK_SECRET: ${OUTLINE_WEBHOOK_SECRET}
+      PROGRAMMING_OUTLINE_SECRET: ${PROGRAMMING_OUTLINE_SECRET}
+      MATTERMOST_WEBHOOK_URL: ${MATTERMOST_WEBHOOK_URL}
+    logging: *logging
+
+  healthwatch:
+    # Polls container health and site uptime, alerting the
+    # Outline-critical-alerts Mattermost channel on state changes only. See
+    # deploy/healthwatch/monitor.js.
+    build: ./deploy/healthwatch
+    restart: unless-stopped
+    volumes:
+      # Read-only, same as watchtower below - only needs to list container
+      # state, never start/stop/exec anything.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CRITICAL_ALERTS_WEBHOOK_URL: ${CRITICAL_ALERTS_WEBHOOK_URL}
+    logging: *logging
+
   watchtower:
     # containrrr/watchtower is unmaintained and hardcodes a Docker API version
     # (1.25) below what modern Docker Engine accepts (this host: 1.52).

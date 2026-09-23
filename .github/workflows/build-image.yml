@@ -125,3 +125,21 @@ jobs:
               [ -n "$tag" ] && echo "| Image | \`$tag\` |"
             done <<< "${{ steps.meta.outputs.tags }}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Runs only when an earlier step in this job failed. Silent no-op if
+      # the repo secret isn't set, so forks and PRs from outside contributors
+      # don't need it configured.
+      - name: Notify on failure
+        if: failure()
+        env:
+          WEBHOOK_URL: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "CRITICAL_ALERTS_WEBHOOK_URL not set, skipping notification"
+            exit 0
+          fi
+          curl -sf -X POST "$WEBHOOK_URL" \
+            -H "content-type: application/json" \
+            -d "$(printf '{"text":"🔴 Build and publish image failed on `%s` (%s): %s"}' \
+              "${GITHUB_REF_NAME}" "${GITHUB_SHA::7}" \
+              "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")"
