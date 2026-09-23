@@ -14,6 +14,13 @@ ARG APP_PATH
 WORKDIR $APP_PATH
 ENV NODE_ENV=production
 
+# The commit this image was built from. `server/env.ts` exposes SOURCE_COMMIT to
+# the client as `env.VERSION`, which the UI surfaces so an operator can confirm
+# which revision is actually deployed. Left empty when the build does not supply
+# it, which the environment parser reads as "no version".
+ARG SOURCE_COMMIT
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
+
 # Limit glibc malloc arenas, which default to 8 per CPU. Each arena can hold
 # onto 64MB of virtual memory and freed allocations, which inflates resident
 # memory in multi-threaded Node.js processes for no performance benefit here.

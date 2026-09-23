@@ -84,6 +84,9 @@ jobs:
           set -euo pipefail
 
           args=(--build-arg "BASE_IMAGE=${BASE_IMAGE}")
+          # Baked into the image and surfaced as `env.VERSION`, so the running
+          # app can report the revision it was built from.
+          args+=(--build-arg "SOURCE_COMMIT=${GITHUB_SHA}")
 
           while IFS= read -r tag; do
             [ -n "$tag" ] && args+=(-t "$tag")
