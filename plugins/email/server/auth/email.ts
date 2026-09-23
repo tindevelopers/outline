@@ -22,6 +22,12 @@ import {
   getUserForInviteToken,
 } from "@server/utils/jwt";
 import { getTeamFromContext } from "@server/utils/passport";
+import {
+  issueVaultEmailToken,
+  isVaultRequest,
+  routeVaultSignIn,
+  verifyVaultEmailToken,
+} from "@server/utils/vault";
 import * as T from "./schema";
 import { CSRF } from "@shared/constants";
 
@@ -35,6 +41,37 @@ router.post(
     const { email, client, preferOTP } = ctx.input.body;
 
     const domain = parseDomain(ctx.request.hostname);
+
+    // Vault entry point: the apex verifies the email identity across all
+    // workspaces and routes by membership when the link is followed.
+    if (await isVaultRequest(ctx)) {
+      const accounts = await User.findAll({
+        where: { email: email.toLowerCase() },
+        include: [{ association: "team", required: true }],
+      });
+      const live = accounts.filter(
+        (account) =>
+          !account.isSuspended &&
+          !account.team.isSuspended &&
+          account.team.emailSigninEnabled
+      );
+
+      if (live.length > 0) {
+        await new SigninEmail({
+          to: email.toLowerCase(),
+          language: live[0].language,
+          token: issueVaultEmailToken(email.toLowerCase()),
+          teamUrl: env.URL,
+          client,
+        }).schedule();
+      }
+
+      // respond with success regardless of whether an email was sent
+      ctx.body = {
+        success: true,
+      };
+      return;
+    }
 
     let team: Team | null | undefined;
     if (!env.isCloudHosted && domain.teamSubdomain) {
@@ -142,6 +179,30 @@ const emailCallback = async (ctx: APIContext<T.EmailCallbackReq>) => {
   }
 
   let user: User | null = null;
+
+  // Vault magic links verify the email identity and route by membership
+  // instead of signing into a single team.
+  if (token) {
+    const vaultEmail = verifyVaultEmailToken(token as string);
+
+    if (vaultEmail) {
+      const outcome = await routeVaultSignIn(ctx, "email", vaultEmail);
+
+      if (outcome.kind === "single") {
+        await signIn(ctx, "email", {
+          user: outcome.user,
+          team: outcome.team,
+          client,
+          isNewTeam: false,
+          isNewUser: false,
+        });
+        return;
+      }
+
+      ctx.redirect("/");
+      return;
+    }
+  }
 
   try {
     if (token) {

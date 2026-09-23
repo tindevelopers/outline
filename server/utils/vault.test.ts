@@ -7,9 +7,12 @@ import { buildTeam, buildUser } from "@server/test/factories";
 import {
   isVaultMode,
   isVaultRequest,
+  issueVaultEmailToken,
+  issueVaultSession,
   resetVaultModeCache,
   routeVaultSignIn,
   setVaultSessionCookie,
+  verifyVaultEmailToken,
   verifyVaultSession,
 } from "./vault";
 
@@ -165,5 +168,19 @@ describe("vault session cookie", () => {
     store["vaultSession"] = "not-a-jwt";
 
     expect(verifyVaultSession(ctx)).toBeUndefined();
+  });
+});
+
+describe("vault email token", () => {
+  it("round trips the email", () => {
+    expect(verifyVaultEmailToken(issueVaultEmailToken("mira@tin.info"))).toBe(
+      "mira@tin.info"
+    );
+  });
+
+  it("rejects tokens of other types", () => {
+    expect(
+      verifyVaultEmailToken(issueVaultSession("mira@tin.info", "email"))
+    ).toBeUndefined();
   });
 });

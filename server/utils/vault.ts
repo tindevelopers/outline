@@ -164,6 +164,51 @@ export function verifyVaultSession(
 }
 
 /**
+ * Creates a signed magic-link token that verifies an email address for vault
+ * routing without being tied to any single team's user row.
+ *
+ * @param email The email address the magic link was requested for.
+ * @returns The signed token string.
+ */
+export function issueVaultEmailToken(email: string): string {
+  return JWT.sign(
+    {
+      email,
+      type: "vault-email",
+      createdAt: new Date().toISOString(),
+      expiresAt: addMinutes(new Date(), 60).toISOString(),
+    },
+    env.SECRET_KEY
+  );
+}
+
+/**
+ * Validates a vault magic-link token.
+ *
+ * @param token The token from the magic link.
+ * @returns The verified email address, or undefined when invalid or expired.
+ */
+export function verifyVaultEmailToken(token: string): string | undefined {
+  try {
+    const payload = JWT.verify(token, env.SECRET_KEY);
+
+    if (
+      typeof payload !== "object" ||
+      payload.type !== "vault-email" ||
+      typeof payload.email !== "string" ||
+      typeof payload.expiresAt !== "string" ||
+      new Date(payload.expiresAt) < new Date()
+    ) {
+      return undefined;
+    }
+
+    return payload.email;
+  } catch (_err) {
+    return undefined;
+  }
+}
+
+/**
  * Routes an authenticated apex sign-in by membership without provisioning
  * anything. One live membership resolves to that team's user row so the
  * caller can hand off through the existing transfer-token flow; zero or
