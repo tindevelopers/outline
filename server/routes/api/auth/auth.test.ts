@@ -1,6 +1,10 @@
 import { faker } from "@faker-js/faker";
 import { randomUUID } from "node:crypto";
-import { Scope } from "@shared/types";
+import { Scope, TeamPreference } from "@shared/types";
+import { getBaseDomain, parseDomain } from "@shared/utils/domains";
+import env from "@server/env";
+import { Team } from "@server/models";
+import { resetVaultModeCache } from "@server/utils/vault";
 import {
   buildApiKey,
   buildOAuthAuthentication,
@@ -314,5 +318,77 @@ describe("#auth.config", () => {
       expect(body.data.providers[2].name).toBe("Google");
       expect(body.data.providers[3].name).toBe("Email");
     });
+  });
+});
+
+describe("#auth.config (vault mode)", () => {
+  const slug = () => randomUUID().split("-")[0];
+
+  beforeAll(async () => {
+    // The vault branches live in the self-hosted code path.
+    setSelfHosted();
+    // Vault mode requires that no team owns the apex; give every pre-existing
+    // apex team from earlier suites a subdomain of its own.
+    const teams = await Team.findAll({ where: { subdomain: null } });
+    for (const team of teams) {
+      team.subdomain = slug();
+      await team.save();
+    }
+    resetVaultModeCache();
+  });
+
+  beforeEach(() => {
+    // The global setup resets env.URL to the cloud host before every test.
+    setSelfHosted();
+    resetVaultModeCache();
+  });
+
+  it("returns the vault flag and no team name on the apex", async () => {
+    await buildTeam({ subdomain: slug() });
+    resetVaultModeCache();
+    const res = await server.post("/api/auth.config", {
+      headers: { host: parseDomain(env.URL).host },
+    });
+    const body = await res.json();
+    expect(res.status).toEqual(200);
+    expect(body.data.vault).toBe(true);
+    expect(body.data.name).toBeUndefined();
+    expect(Array.isArray(body.data.providers)).toBe(true);
+  });
+
+  it("gates tenant name behind PublicBranding", async () => {
+    const team = await buildTeam({ subdomain: slug() });
+    const host = `${team.subdomain}.${getBaseDomain()}`;
+
+    let res = await server.post("/api/auth.config", { headers: { host } });
+    let body = await res.json();
+    expect(body.data.name).toBeUndefined();
+
+    team.setPreference(TeamPreference.PublicBranding, true);
+    await team.save();
+    res = await server.post("/api/auth.config", { headers: { host } });
+    body = await res.json();
+    expect(body.data.name).toEqual(team.name);
+  });
+
+  it("reports unknown tenant subdomains without team details", async () => {
+    const res = await server.post("/api/auth.config", {
+      headers: { host: `missing-${slug()}.${getBaseDomain()}` },
+    });
+    const body = await res.json();
+    expect(body.data.workspaceNotFound).toBe(true);
+    expect(body.data.name).toBeUndefined();
+    expect(body.data.vault).toBeUndefined();
+  });
+
+  it("keeps legacy apex branding for single-team installs", async () => {
+    const team = await buildTeam({ domain: parseDomain(env.URL).host });
+    resetVaultModeCache();
+    const res = await server.post("/api/auth.config", {
+      headers: { host: parseDomain(env.URL).host },
+    });
+    const body = await res.json();
+    expect(body.data.vault).toBeUndefined();
+    expect(body.data.name).toEqual(team.name);
   });
 });

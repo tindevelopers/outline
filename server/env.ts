@@ -13,6 +13,7 @@ import {
   IsNumber,
   IsIn,
   IsBoolean,
+  IsEmail,
   Min,
 } from "class-validator";
 import { uniq } from "es-toolkit/compat";
@@ -79,6 +80,14 @@ export class Environment {
    */
   @IsNotEmpty()
   public UTILS_SECRET = environment.UTILS_SECRET ?? "";
+
+  /**
+   * Contact address offered on the vault Launchpad no-access state for
+   * requesting workspace membership. Optional; the mailto is hidden when unset.
+   */
+  @IsOptional()
+  @IsEmail()
+  public VAULT_ACCESS_EMAIL = environment.VAULT_ACCESS_EMAIL ?? "";
 
   /**
    * The url of the database.
