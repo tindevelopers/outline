@@ -299,10 +299,11 @@ export default class AuthStore extends Store<Team> {
    * @returns The tenant URL carrying a short-lived transfer token.
    */
   transferToTeam = async (teamId: string): Promise<string> => {
-    const res: { url: string } = await client.post("/vault.transfer", {
-      teamId,
-    });
-    return res.url;
+    const res: { data: { url: string } } = await client.post(
+      "/vault.transfer",
+      { teamId }
+    );
+    return res.data.url;
   };
 
   requestDeleteTeam = () => client.post(`/teams.requestDelete`);

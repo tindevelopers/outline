@@ -48,6 +48,21 @@ export function isSignedOutError(err: unknown): boolean {
 }
 
 /**
+ * Fetches the verified identity and the workspaces it is a member of. The
+ * API client returns the whole response body, so the payload is under `data`.
+ *
+ * @returns The signed-in email and its workspaces.
+ */
+export async function fetchVaultWorkspaces(): Promise<{
+  email: string;
+  workspaces: VaultWorkspace[];
+}> {
+  const res: { data: { email: string; workspaces: VaultWorkspace[] } } =
+    await client.post("/vault.workspaces", {});
+  return { email: res.data.email, workspaces: res.data.workspaces ?? [] };
+}
+
+/**
  * Loads the workspaces the current vault identity is a member of.
  *
  * @returns The reactive vault state for the Launchpad.
@@ -58,15 +73,10 @@ export function useVaultWorkspaces(): VaultState {
   React.useEffect(() => {
     let mounted = true;
 
-    client
-      .post("/vault.workspaces", {})
-      .then((res: { email: string; workspaces: VaultWorkspace[] }) => {
+    fetchVaultWorkspaces()
+      .then(({ email, workspaces }) => {
         if (mounted) {
-          setState({
-            status: "ready",
-            email: res.email,
-            workspaces: res.workspaces,
-          });
+          setState({ status: "ready", email, workspaces });
         }
       })
       .catch((err: unknown) => {
@@ -95,8 +105,10 @@ export function useVaultWorkspaces(): VaultState {
  * @returns The tenant URL carrying a short-lived transfer token.
  */
 export async function requestVaultTransfer(teamId: string): Promise<string> {
-  const res = await client.post("/vault.transfer", { teamId });
-  return res.url;
+  const res: { data: { url: string } } = await client.post("/vault.transfer", {
+    teamId,
+  });
+  return res.data.url;
 }
 
 /**
