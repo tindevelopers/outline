@@ -10,6 +10,7 @@ Scalar.createApiReference("#app", {
   metaData: { title: "TIN Vault API" },
   favicon: "/images/favicon-32.png",
   hideDarkModeToggle: false,
+  showDeveloperTools: "never",
   customCss: `
     @font-face { font-family: "Inter"; src: url("/fonts/Inter.var.woff2") format("woff2"); font-weight: 100 900; }
     @font-face { font-family: "Manrope"; src: url("/fonts/manrope-latin.woff2") format("woff2"); font-weight: 400 800; }

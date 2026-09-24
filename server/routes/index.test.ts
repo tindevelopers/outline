@@ -410,6 +410,17 @@ describe("/developers", () => {
     expect(res.headers.get("location")).toEqual(`${env.URL}/developers`);
   });
 
+  it("keeps the query string when redirecting a workspace host to the apex portal", async () => {
+    const res = await server.get("/developers?search=foo", {
+      headers: { host: `tin.${apexHost()}` },
+      redirect: "manual",
+    });
+    expect(res.status).toEqual(302);
+    expect(res.headers.get("location")).toEqual(
+      `${env.URL}/developers?search=foo`
+    );
+  });
+
   it("does not serve files outside public/developers", async () => {
     const res = await server.get("/developers/..%2f..%2fpackage.json", {
       headers: { host: apexHost() },

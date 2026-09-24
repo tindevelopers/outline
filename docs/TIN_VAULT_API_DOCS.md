@@ -28,9 +28,13 @@ If the script exits with `branding left in output: ...`, add a targeted
 `.replace()` for the reported string in `scripts/openapi/build-tin-vault-spec.mjs`
 and re-run. Never remove or weaken that guard.
 
+`outline/openapi@main` tracks Outline's latest API, which may be ahead of the
+Outline version this fork has merged. Review the spec diff against the
+fork's `server/routes/api` changes before committing a sync.
+
 ## Updating Scalar
 
-Task 2 vendors a self-hosted, first-party Scalar viewer at `/developers`
+The commit that serves the self-hosted portal vendors a first-party Scalar viewer at `/developers`
 (apex only; workspace hosts redirect there — see `server/routes/index.ts`).
 It is pinned to `@scalar/api-reference@1.71.0` and configured with no
 `proxyUrl`, `withDefaultFonts: false`, and `agent: { disabled: true }`, so
@@ -87,10 +91,20 @@ their content altered beyond what the sync process above produces:
 - The BSD-3-Clause header block prepended to the top of the generated
   `public/developers/openapi.yaml`.
 - `public/developers/LICENSES/scalar-MIT.txt` — the MIT license text for the
-  Scalar viewer bundle added in Task 2. `standalone.js` itself has no
-  top-of-file license banner and the npm tarball ships no `LICENSE` file
-  (only `"license": "MIT"` in `package.json`), so the text is fetched from
-  the `scalar/scalar` repository instead.
+  vendored Scalar viewer bundle. `standalone.js` carries a one-line
+  top-of-file banner pointing back at this file; the npm tarball ships no
+  `LICENSE` file (only `"license": "MIT"` in `package.json`), so the full
+  text is fetched from the `scalar/scalar` repository instead.
+
+## Notes
+
+- The apex OAuth `authorizationUrl` (`https://docs.tin.info/oauth/authorize`)
+  hands off to the OAuth client's own workspace, so it works for users of the
+  workspace that owns the client. Published clients used from other
+  workspaces should use that workspace's own `/oauth/authorize` instead.
+- "Try it" in the portal runs against the apex, so unauthenticated endpoints
+  that infer the workspace from the host (e.g. `auth.config`) behave
+  differently there than they do on a workspace host.
 
 ## Rollback
 
@@ -100,9 +114,9 @@ No database migrations, no data changes, and no credential or prefix changes, so
 
 | Situation | Action | Time |
 | --- | --- | --- |
-| Anything wrong after deploy (fastest) | On the server: set `OUTLINE_TAG=<sha7 from Task 5 Step 1>` in `/root/outline/.env`, then `cd /root/outline && docker compose up -d outline`. Watchtower only follows `latest`, so the pinned tag stays put. | ~1 min |
+| Anything wrong after deploy (fastest) | On the server: set `OUTLINE_TAG=<sha7 of the previously deployed image>` in `/root/outline/.env`, then `cd /root/outline && docker compose up -d outline`. Watchtower only follows `latest`, so the pinned tag stays put. | ~1 min |
 | Permanent revert of everything | GitHub → the PR → **Revert** → merge the revert PR. The image build and Watchtower redeploy `latest` automatically. Then remove `OUTLINE_TAG` from `.env` and run `docker compose up -d outline` to follow `latest` again. | ~15 min |
-| Only the OAuth hand-off misbehaves | `git revert <Task 3 commit>` in a small PR. The portal and links stay. | ~15 min |
-| Only the portal misbehaves | `git revert <Task 2 commit>` and `<Task 4 commit>` (links would point at a missing page otherwise). OAuth fix stays. | ~15 min |
+| Only the OAuth hand-off misbehaves | `git revert <the commit that hands apex OAuth authorize off to the client's workspace>` in a small PR. The portal and links stay. | ~15 min |
+| Only the portal misbehaves | `git revert <the commit that serves the portal>` and `<the commit that links to it from API documentation>` (links would point at a missing page otherwise). OAuth fix stays. | ~15 min |
 
 After any rollback: `curl -s -o /dev/null -w '%{http_code}' https://docs.tin.info/` returns 200, and apex and workspace discovery return 200.

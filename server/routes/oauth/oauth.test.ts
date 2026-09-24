@@ -753,7 +753,7 @@ describe("GET /oauth/authorize on the vault apex", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
-  it("never redirects to the apex itself", async () => {
+  it("falls through for a team without a subdomain", async () => {
     const team = await buildTeam();
     const client = await buildOAuthClient({ teamId: team.id });
     mockVaultMode();

@@ -156,7 +156,7 @@ router.get("/sitemap.xml", async (ctx) => {
 // with /api and needs no CORS or proxy; workspace hosts redirect there.
 router.get(["/developers", "/developers/*"], async (ctx) => {
   if (ctx.hostname !== new URL(env.URL).hostname) {
-    ctx.redirect(`${env.URL}${ctx.path}`);
+    ctx.redirect(`${env.URL}${ctx.path}${ctx.search}`);
     return;
   }
   const file =
