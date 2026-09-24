@@ -6,6 +6,10 @@ Scalar.createApiReference("#app", {
   servers: [{ url: `${location.origin}/api`, description: "TIN Vault" }],
   withDefaultFonts: false,
   agent: { disabled: true },
+  // Keep users on this origin: no link to Scalar's hosted API client (where a
+  // pasted API key would leave TIN) and no hosted MCP generator.
+  hideClientButton: true,
+  mcp: { disabled: true },
   authentication: { preferredSecurityScheme: "BearerAuth" },
   metaData: { title: "TIN Vault API" },
   favicon: "/images/favicon-32.png",
