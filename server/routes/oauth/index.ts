@@ -20,6 +20,7 @@ import { RateLimiterStrategy } from "@server/utils/RateLimiter";
 import { TeamPreference } from "@shared/types";
 import { OAuthInterface } from "@server/utils/oauth/OAuthInterface";
 import { getTeamFromContext } from "@server/utils/passport";
+import { isVaultRequest } from "@server/utils/vault";
 import oauthErrorHandler from "./middlewares/oauthErrorHandler";
 import registrationAuth from "./middlewares/registrationAuth";
 import * as T from "./schema";
@@ -38,6 +39,36 @@ const oauth = new OAuth2Server({
   // https://www.rfc-editor.org/rfc/rfc6819#section-5.2.2.3
   alwaysIssueNewRefreshToken: true,
 });
+
+// On the vault apex nobody holds a workspace session, so consent can't
+// happen here. Every OAuth client belongs to exactly one workspace: send the
+// request there with its query untouched. The target comes only from the team
+// record, so this is not an open redirect. Anything else falls through to the
+// app shell unchanged.
+router.get(
+  "/authorize",
+  rateLimiter(RateLimiterStrategy.OneHundredPerHour),
+  async (ctx, next) => {
+    const clientId = ctx.query.client_id;
+    if (typeof clientId !== "string" || !(await isVaultRequest(ctx))) {
+      return next();
+    }
+
+    const client = await OAuthClient.findByClientId(clientId);
+    const team = client ? await Team.findByPk(client.teamId) : null;
+    if (!team?.subdomain || team.isSuspended) {
+      return next();
+    }
+
+    // Never hand off to the host we are already on, that would loop.
+    const target = new URL(team.url);
+    if (target.host === ctx.host) {
+      return next();
+    }
+
+    ctx.redirect(`${target.origin}/oauth/authorize${ctx.search}`);
+  }
+);
 
 router.post(
   "/authorize",

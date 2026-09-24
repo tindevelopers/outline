@@ -3,6 +3,7 @@ import { TeamPreference } from "@shared/types";
 import env from "@server/env";
 import { getOAuthOrigin } from "@server/utils/oauth";
 import { getTeamFromContext } from "@server/utils/passport";
+import { isVaultRequest } from "@server/utils/vault";
 
 const router = new Router();
 
@@ -15,14 +16,18 @@ router.get(
     const team = await getTeamFromContext(ctx, { includeOAuthState: false });
     const origin = getOAuthOrigin(ctx, team);
     const mcpEnabled = team?.getPreference(TeamPreference.MCP) ?? true;
+    const vaultApex = await isVaultRequest(ctx);
 
     ctx.body = {
       issuer: origin,
       authorization_endpoint: `${origin}/oauth/authorize`,
       token_endpoint: `${origin}/oauth/token`,
       revocation_endpoint: `${origin}/oauth/revoke`,
+      // Registration needs a workspace and 404s on the vault apex, so don't
+      // advertise it there.
       ...(!env.OAUTH_DISABLE_DCR &&
-        mcpEnabled && {
+        mcpEnabled &&
+        !vaultApex && {
           registration_endpoint: `${origin}/oauth/register`,
         }),
       response_types_supported: ["code"],
