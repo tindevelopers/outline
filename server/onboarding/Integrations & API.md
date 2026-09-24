@@ -23,7 +23,7 @@ curl -XPOST -H "Content-type: application/json" -d '{
   "title": "My first document",
   "text": "Hello from the API 👋",
   "collectionId": "COLLECTION_ID", // find the collection id in the URL bar
-  "token": "API_TOKEN", // get an API token from Settings → API & Apps in your workspace
+  "token": "API_TOKEN", // get an API token from Settings → API & Access in your workspace
   "publish": true
 }' 'https://docs.tin.info/api/documents.create'
 ```

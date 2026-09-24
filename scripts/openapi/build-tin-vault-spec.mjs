@@ -31,7 +31,13 @@ const rewrite = (s) =>
     )
     .replace(/\bOutline API\b/g, "TIN Vault API")
     .replace(/\bOutline(’|')s\b/g, "TIN Vault$1s")
-    .replace(/\bOutline\b/g, "TIN Vault");
+    .replace(/\bOutline\b/g, "TIN Vault")
+    // Example values and prose only. Real API values such as the
+    // `outline-markdown` export format must stay as they are.
+    .replace(/\boutline-api-/g, "tin-vault-api-")
+    .replace(/\/webhooks\/outline\b/g, "/webhooks/tin-vault")
+    .replace(/in the outline-icons package/g, "from the built-in icon set")
+    .replace(/from the outline-icons package/g, "from the built-in icon set");
 
 // Recursively rewrite every string value. Keys, and so paths and schema
 // names, stay untouched.

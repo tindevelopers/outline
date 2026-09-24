@@ -60,7 +60,7 @@ info:
     -H 'authorization: Bearer MY_API_KEY' \
     -H 'content-type: application/json' \
     -H 'accept: application/json' \
-    -d '{"id": "outline-api-NTpezNwhUP"}'
+    -d '{"id": "tin-vault-api-NTpezNwhUP"}'
     ```
 
     Or, with JavaScript:
@@ -1142,7 +1142,7 @@ paths:
                   $ref: '#/components/schemas/Permission'
                 icon:
                   type: string
-                  description: A string that represents an icon in the outline-icons package or an emoji
+                  description: A string that represents an icon from the built-in icon set or an emoji
                 color:
                   type: string
                   description: A hex color code for the collection icon
@@ -1260,7 +1260,7 @@ paths:
                   $ref: '#/components/schemas/Permission'
                 icon:
                   type: string
-                  description: A string that represents an icon in the outline-icons package or an emoji
+                  description: A string that represents an icon from the built-in icon set or an emoji
                 color:
                   type: string
                   description: A hex color code for the collection icon
@@ -7762,7 +7762,7 @@ paths:
                   format: uri
                   maxLength: 1024
                   description: The URL that receives webhook requests. Cloud-hosted workspaces require an HTTPS URL.
-                  example: https://example.com/webhooks/outline
+                  example: https://example.com/webhooks/tin-vault
                 secret:
                   type: string
                   nullable: true
@@ -7825,7 +7825,7 @@ paths:
                   format: uri
                   maxLength: 1024
                   description: The URL that receives webhook requests. Cloud-hosted workspaces require an HTTPS URL.
-                  example: https://example.com/webhooks/outline
+                  example: https://example.com/webhooks/tin-vault
                 secret:
                   type: string
                   nullable: true
@@ -8311,7 +8311,7 @@ components:
         icon:
           type: string
           nullable: true
-          description: A string that represents an icon in the outline-icons package or an emoji
+          description: A string that represents an icon from the built-in icon set or an emoji
         permission:
           $ref: '#/components/schemas/Permission'
         templateManagement:
@@ -8480,7 +8480,7 @@ components:
       properties:
         icon:
           type: string
-          description: An icon representing the data attribute from the outline-icons package.
+          description: An icon representing the data attribute from the built-in icon set.
         options:
           type: array
           description: Valid options for list data type.
@@ -9627,7 +9627,7 @@ components:
           format: uri
           maxLength: 1024
           description: The URL that receives webhook requests.
-          example: https://example.com/webhooks/outline
+          example: https://example.com/webhooks/tin-vault
         secret:
           type: string
           nullable: true
