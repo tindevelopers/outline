@@ -123,7 +123,7 @@ class ErrorBoundaryClass extends React.Component<Props> {
   };
 
   handleReportBug = () => {
-    window.open(isCloudHosted ? UrlHelper.contact : UrlHelper.github);
+    window.open(UrlHelper.contact);
   };
 
   handleClearCache = async () => {

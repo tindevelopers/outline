@@ -12,7 +12,6 @@ import {
   BrowserIcon,
   ShapesIcon,
   DraftsIcon,
-  BugIcon,
   ImportIcon,
 } from "outline-icons";
 import { UrlHelper } from "@shared/utils/UrlHelper";
@@ -206,26 +205,6 @@ export const openFeedbackUrl = createExternalLinkAction({
   target: "_blank",
 });
 
-export const openBugReportUrl = createExternalLinkAction({
-  name: ({ t }) => t("Report a bug"),
-  analyticsName: "Open bug report",
-  section: NavigationSection,
-  iconInContextMenu: false,
-  icon: <BugIcon />,
-  url: UrlHelper.github,
-  target: "_blank",
-});
-
-export const openChangelog = createExternalLinkAction({
-  name: ({ t }) => t("Changelog"),
-  analyticsName: "Open changelog",
-  section: NavigationSection,
-  iconInContextMenu: false,
-  icon: <OpenIcon />,
-  url: UrlHelper.changelog,
-  target: "_blank",
-});
-
 export const openKeyboardShortcuts = createAction({
   name: ({ t }) => t("Keyboard shortcuts"),
   analyticsName: "Open keyboard shortcuts",
@@ -277,8 +256,6 @@ export const rootNavigationActions = [
   openDocumentation,
   openAPIDocumentation,
   openFeedbackUrl,
-  openBugReportUrl,
-  openChangelog,
   openKeyboardShortcuts,
   toggleSidebar,
   logout,
