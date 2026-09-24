@@ -109,6 +109,13 @@ describe("OAuthInterface", () => {
       });
       const refreshToken = rotated.refreshToken!;
 
+      // The client already used the tokens issued in its place, so a replay
+      // of the old token is genuine reuse.
+      await OAuthAuthentication.update(
+        { lastActiveAt: new Date() },
+        { where: { id: sibling.id }, silent: true }
+      );
+
       // Simulate a rotation that happened longer ago than the reuse interval.
       await rotated.destroy();
       await OAuthAuthentication.update(
@@ -119,6 +126,79 @@ describe("OAuthInterface", () => {
       const result = await OAuthInterface.getRefreshToken(refreshToken);
       expect(result).toBe(false);
       expect(await OAuthAuthentication.findByPk(sibling.id)).toBeNull();
+    });
+
+    it("should revoke the entire grant when a rotated refresh token is replayed after the retry interval", async () => {
+      const user = await buildUser();
+      const scope = [Scope.Read];
+      const grantId = randomUUID();
+      const oAuthClient = await buildOAuthClient({ teamId: user.teamId });
+      const rotated = await buildOAuthAuthentication({
+        user,
+        oauthClientId: oAuthClient.id,
+        scope,
+        grantId,
+      });
+      const successor = await buildOAuthAuthentication({
+        user,
+        oauthClientId: oAuthClient.id,
+        scope,
+        grantId,
+      });
+      const refreshToken = rotated.refreshToken!;
+
+      await rotated.destroy();
+      await OAuthAuthentication.update(
+        { deletedAt: subSeconds(new Date(), 10 * 60) },
+        { where: { id: rotated.id }, paranoid: false, silent: true }
+      );
+
+      const result = await OAuthInterface.getRefreshToken(refreshToken);
+      expect(result).toBe(false);
+      expect(await OAuthAuthentication.findByPk(successor.id)).toBeNull();
+    });
+
+    it("should accept a rotated refresh token again when the tokens issued in its place were never used", async () => {
+      const user = await buildUser();
+      const scope = [Scope.Read];
+      const grantId = randomUUID();
+      const oAuthClient = await buildOAuthClient({ teamId: user.teamId });
+      const rotated = await buildOAuthAuthentication({
+        user,
+        oauthClientId: oAuthClient.id,
+        scope,
+        grantId,
+      });
+      const successor = await buildOAuthAuthentication({
+        user,
+        oauthClientId: oAuthClient.id,
+        scope,
+        grantId,
+      });
+      const refreshToken = rotated.refreshToken!;
+
+      // The client lost the rotation response and retries 91 seconds later.
+      await rotated.destroy();
+      await OAuthAuthentication.update(
+        { deletedAt: subSeconds(new Date(), 91) },
+        { where: { id: rotated.id }, paranoid: false, silent: true }
+      );
+
+      const result = await OAuthInterface.getRefreshToken(refreshToken);
+      expect(result).toEqual(
+        expect.objectContaining({
+          refreshToken,
+          scope,
+          client: {
+            id: oAuthClient.clientId,
+            grants: OAuthInterface.grants,
+          },
+          user: expect.objectContaining({ id: user.id, grantId }),
+        })
+      );
+      // The unused tokens are replaced by the ones issued for the retry.
+      expect(await OAuthAuthentication.findByPk(successor.id)).toBeNull();
+      expect(result && (await OAuthInterface.revokeToken(result))).toBe(true);
     });
 
     it("should not revoke the grant when a rotated refresh token is replayed within the reuse interval", async () => {

@@ -24,6 +24,15 @@ import { hash, safeEqual } from "@server/utils/crypto";
 const refreshTokenReuseInterval = 10;
 
 /**
+ * The number of seconds during which a rotated refresh token can be redeemed
+ * again, provided none of the tokens issued in its place have been used. This
+ * lets a client that never received a rotation response (a dropped connection
+ * or a server restart mid-request) recover, instead of losing the grant to
+ * reuse detection.
+ */
+const refreshTokenRetryInterval = 5 * 60;
+
+/**
  * Additional configuration for the OAuthInterface, not part of the
  * OAuth2Server library.
  */
@@ -129,17 +138,16 @@ export const OAuthInterface: RefreshTokenModel &
     if (!authentication) {
       // If the refresh token is not found, it may have already been used or
       // revoked. In this case we perform reuse detection as recommended by RFC 9700.
-      authentication = await OAuthAuthentication.findOne({
-        where: {
-          refreshTokenHash: hash(refreshToken),
-        },
-        paranoid: false,
-      });
+      authentication = await OAuthAuthentication.findByRefreshToken(
+        refreshToken,
+        { paranoid: false }
+      );
 
       // A recently rotated token may be replayed by a client that issued
       // concurrent refresh requests. Treat replays within the reuse interval as
       // benign and skip revocation, so the grant won by the parallel request
-      // survives. Replays outside the window are treated as genuine reuse.
+      // survives. Replays outside the window are treated as genuine reuse,
+      // unless the client evidently never received the rotated tokens.
       const reuseWindowStart = subSeconds(
         new Date(),
         refreshTokenReuseInterval
@@ -147,6 +155,29 @@ export const OAuthInterface: RefreshTokenModel &
       const withinReuseInterval =
         authentication?.deletedAt &&
         authentication.deletedAt > reuseWindowStart;
+
+      if (
+        authentication &&
+        !withinReuseInterval &&
+        (await releaseUnusedRotation(authentication))
+      ) {
+        const user = authentication.user;
+        Object.assign(user, { grantId: authentication.grantId });
+
+        return {
+          refreshToken,
+          refreshTokenExpiresAt: authentication.refreshTokenExpiresAt,
+          scope: authentication.scope,
+          client: {
+            id: authentication.oauthClient.clientId,
+            grants: this.grants,
+          },
+          user,
+          // The row behind this token is already deleted, so revokeToken must
+          // report success without deleting anything.
+          retriedRotation: true,
+        };
+      }
 
       if (authentication?.grantId && !withinReuseInterval) {
         await Promise.all([
@@ -336,6 +367,9 @@ export const OAuthInterface: RefreshTokenModel &
    * @returns True if the token was revoked, false otherwise.
    */
   async revokeToken(token) {
+    if (token.retriedRotation === true) {
+      return true;
+    }
     return OAuthAuthentication.revokeByRefreshToken(token.refreshToken);
   },
 
@@ -411,3 +445,38 @@ export const OAuthInterface: RefreshTokenModel &
       : false;
   },
 };
+
+/**
+ * Decides whether a rotated refresh token may be redeemed again because the
+ * client never received the tokens issued in its place. That holds when the
+ * rotation happened within the retry interval and none of the grant's live
+ * tokens have been used. The unused tokens are revoked so that only the tokens
+ * issued for the retry stay valid.
+ *
+ * @param authentication The soft-deleted authentication the token belonged to.
+ * @returns True if the token may be redeemed again.
+ */
+async function releaseUnusedRotation(
+  authentication: OAuthAuthentication
+): Promise<boolean> {
+  const { grantId, deletedAt } = authentication;
+  if (
+    !grantId ||
+    !deletedAt ||
+    deletedAt < subSeconds(new Date(), refreshTokenRetryInterval)
+  ) {
+    return false;
+  }
+
+  const successors = await OAuthAuthentication.findAll({
+    where: { grantId },
+  });
+  if (!successors.length || successors.some((s) => s.lastActiveAt)) {
+    return false;
+  }
+
+  await OAuthAuthentication.destroy({
+    where: { id: successors.map((s) => s.id) },
+  });
+  return true;
+}

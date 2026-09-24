@@ -33,9 +33,19 @@ docs.tin.info, *.docs.tin.info {
 	@realtime path /realtime /realtime/*
 	reverse_proxy @realtime outline:3000 {
 		flush_interval -1
+		lb_try_duration 60s
+		lb_try_interval 500ms
 	}
 
-	reverse_proxy outline:3000
+	# Watchtower replaces the outline container on every deploy, leaving it
+	# unreachable for a few seconds. Instead of answering 502, hold requests
+	# and keep retrying until the new container accepts connections. Caddy
+	# always retries requests that never reached the upstream, POSTs included,
+	# so OAuth token refreshes made mid-deploy succeed rather than fail.
+	reverse_proxy outline:3000 {
+		lb_try_duration 60s
+		lb_try_interval 500ms
+	}
 
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"

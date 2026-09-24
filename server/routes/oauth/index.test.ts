@@ -54,6 +54,78 @@ describe("#oauth.revoke", () => {
 
 describe("#oauth.token", () => {
   describe("refresh_token grant", () => {
+    /**
+     * Rotates a refresh token through the endpoint, then backdates the
+     * rotation so a replay falls outside the concurrent-request window.
+     */
+    async function rotateAndAge(secondsAgo: number) {
+      const user = await buildUser();
+      const client = await buildOAuthClient({
+        teamId: user.teamId,
+        clientType: "public",
+      });
+      const auth = await buildOAuthAuthentication({
+        user,
+        scope: [Scope.Read],
+        oauthClientId: client.id,
+        grantId: crypto.randomUUID(),
+      });
+      const refresh = (refreshToken: string) =>
+        server.post("/oauth/token", {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: toFormData({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+            client_id: client.clientId,
+          }),
+        });
+
+      const first = await refresh(auth.refreshToken!);
+      expect(first.status).toEqual(200);
+      const firstBody = await first.json();
+      await OAuthAuthentication.update(
+        { deletedAt: new Date(Date.now() - secondsAgo * 1000) },
+        { where: { id: auth.id }, paranoid: false, silent: true }
+      );
+
+      return { auth, firstBody, refresh };
+    }
+
+    it("should issue new tokens when a client retries a rotation whose response it never used", async () => {
+      const { auth, firstBody, refresh } = await rotateAndAge(91);
+
+      const retry = await refresh(auth.refreshToken!);
+      expect(retry.status).toEqual(200);
+      const body = await retry.json();
+      expect(body.refresh_token).toBeTruthy();
+      expect(body.refresh_token).not.toEqual(firstBody.refresh_token);
+
+      // Only the retried tokens stay valid.
+      expect(
+        await OAuthAuthentication.findByRefreshToken(firstBody.refresh_token)
+      ).toBeNull();
+      expect(
+        await OAuthAuthentication.findByRefreshToken(body.refresh_token)
+      ).not.toBeNull();
+    });
+
+    it("should revoke the grant when a rotation is replayed after the new tokens were used", async () => {
+      const { auth, firstBody, refresh } = await rotateAndAge(91);
+      const successor = await OAuthAuthentication.findByRefreshToken(
+        firstBody.refresh_token
+      );
+      await OAuthAuthentication.update(
+        { lastActiveAt: new Date() },
+        { where: { id: successor!.id }, silent: true }
+      );
+
+      const replay = await refresh(auth.refreshToken!);
+      expect(replay.status).toEqual(400);
+      expect(
+        await OAuthAuthentication.findByRefreshToken(firstBody.refresh_token)
+      ).toBeNull();
+    });
+
     it("should successfully refresh token for confidential client with client_secret", async () => {
       const user = await buildUser();
       const client = await buildOAuthClient({
@@ -272,6 +344,13 @@ describe("#oauth.token", () => {
         { where: { id: auth1.id }, paranoid: false, silent: true }
       );
 
+      // The client already used the rotated tokens, so the replay cannot be a
+      // retry of a lost rotation response.
+      await OAuthAuthentication.update(
+        { lastActiveAt: new Date() },
+        { where: { grantId }, silent: true }
+      );
+
       // Create an unrelated authentication
       const otherAuth = await buildOAuthAuthentication({
         user,
@@ -347,6 +426,13 @@ describe("#oauth.token", () => {
       await OAuthAuthentication.update(
         { deletedAt: new Date(Date.now() - 60 * 1000) },
         { where: { id: auth.id }, paranoid: false, silent: true }
+      );
+
+      // The client already used the rotated tokens, so the replay cannot be a
+      // retry of a lost rotation response.
+      await OAuthAuthentication.update(
+        { lastActiveAt: new Date() },
+        { where: { grantId }, silent: true }
       );
 
       // Use the OLD refresh token again (reuse detection)
