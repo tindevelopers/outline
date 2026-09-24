@@ -30,10 +30,52 @@ and re-run. Never remove or weaken that guard.
 
 ## Updating Scalar
 
-Task 2 wires up a self-hosted Scalar viewer for `openapi.yaml`. After syncing
-the spec to a new upstream commit (above), bump the viewer to point at the
-new `public/developers/openapi.yaml` per Task 2 Step 1, so the served docs
-reflect the newly synced spec.
+Task 2 vendors a self-hosted, first-party Scalar viewer at `/developers`
+(apex only; workspace hosts redirect there — see `server/routes/index.ts`).
+It is pinned to `@scalar/api-reference@1.71.0` and configured with no
+`proxyUrl`, `withDefaultFonts: false`, and `agent: { disabled: true }`, so
+"Try it" stays same-origin with `/api` and nothing is fetched from
+scalar.com. To bump the pinned version:
+
+```bash
+cd /tmp && npm pack @scalar/api-reference@<version> && tar -xzf scalar-api-reference-<version>.tgz
+cp package/dist/browser/standalone.js /path/to/outline/public/developers/vendor/scalar/standalone.js
+curl -fsSL https://raw.githubusercontent.com/scalar/scalar/main/LICENSE -o /path/to/outline/public/developers/LICENSES/scalar-MIT.txt
+```
+
+`dist/browser/standalone.js` is the real path in 1.71.0 (there is no
+`package/LICENSE` in the npm tarball — the package.json `license` field says
+`MIT`, and the upstream `scalar/scalar` repo LICENSE at its `main` branch is
+the canonical text; the monorepo license is not versioned per-package tag).
+
+After copying the new bundle:
+
+1. Diff `public/developers/init.js` against the new version's config schema.
+   The tarball doesn't ship `@scalar/types`, so `npm pack @scalar/types@<version>`
+   (matching the `@scalar/types` version in `package/package.json`'s
+   `dependencies`) and check
+   `package/dist/api-reference/api-reference-configuration.d.ts` (top-level
+   keys: `title`, `authentication`, `servers`, `withDefaultFonts`,
+   `hideDarkModeToggle`, `metaData`, `favicon`, `customCss`, …) and
+   `package/dist/api-reference/types.d.ts` (the per-source `agent?: { key?,
+   disabled?, hideAddApi? }` key, and `authentication.preferredSecurityScheme`
+   in `authentication-configuration.d.ts`). Drop or rename any key that no
+   longer exists and note the change here.
+2. Grep the new bundle for hosts it could still talk to:
+   `grep -o '[a-z0-9.-]*\.scalar\.com\|cdn\.jsdelivr\.net\|fonts\.googleapis\.com' standalone.js`.
+   As of 1.71.0 the bundle's config schema has a hard-coded
+   `proxyUrl: { default: 'https://proxy.scalar.com' }`, but that default is
+   only used by Scalar's own dashboard/registry "workspace" UI (not
+   `createApiReference`); the internal fetch helper resolves an unset
+   `proxyUrl` (`e.options.proxyUrl ?? ''`) to an empty string, which the
+   `My()` URL-prefixing helper treats as "no proxy" and passes the request
+   URL through unmodified. `fonts.googleapis.com` / `cdn.jsdelivr.net` do not
+   appear in the bundle at all. Re-check this on every version bump — it is
+   not enforced by a type, only by the bundle's runtime behaviour.
+3. Verify `/developers` in a browser: open dev tools Network tab, confirm
+   every request stays same-origin (only `docs.tin.info`, no
+   `proxy.scalar.com` / `api.scalar.com` / `fonts.googleapis.com`), and check
+   the console for CSP violations.
 
 ## Licence notices
 
@@ -44,8 +86,11 @@ their content altered beyond what the sync process above produces:
   vendored upstream BSD-3-Clause LICENSE for `outline/openapi`.
 - The BSD-3-Clause header block prepended to the top of the generated
   `public/developers/openapi.yaml`.
-- The MIT license header in `standalone.js` (the Scalar viewer bundle added
-  in Task 2).
+- `public/developers/LICENSES/scalar-MIT.txt` — the MIT license text for the
+  Scalar viewer bundle added in Task 2. `standalone.js` itself has no
+  top-of-file license banner and the npm tarball ships no `LICENSE` file
+  (only `"license": "MIT"` in `package.json`), so the text is fetched from
+  the `scalar/scalar` repository instead.
 
 ## Rollback
 

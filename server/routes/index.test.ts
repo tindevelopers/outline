@@ -377,6 +377,47 @@ describe("scanner path 404s", () => {
   });
 });
 
+describe("/developers", () => {
+  const apexHost = () => new URL(env.URL).host;
+
+  it("serves the TIN Vault API portal on the apex", async () => {
+    const res = await server.get("/developers", {
+      headers: { host: apexHost() },
+    });
+    const html = await res.text();
+    expect(res.status).toEqual(200);
+    expect(html).toContain("<title>TIN Vault API</title>");
+    expect(html).not.toMatch(/<script>(?!<\/script>)/); // no inline scripts, CSP stays strict
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("serves the rebranded spec", async () => {
+    const res = await server.get("/developers/openapi.yaml", {
+      headers: { host: apexHost() },
+    });
+    const body = await res.text();
+    expect(res.status).toEqual(200);
+    expect(body).toContain("title: TIN Vault API");
+    expect(body).not.toContain("app.getoutline.com");
+  });
+
+  it("redirects a workspace host to the apex portal", async () => {
+    const res = await server.get("/developers", {
+      headers: { host: `tin.${apexHost()}` },
+      redirect: "manual",
+    });
+    expect(res.status).toEqual(302);
+    expect(res.headers.get("location")).toEqual(`${env.URL}/developers`);
+  });
+
+  it("does not serve files outside public/developers", async () => {
+    const res = await server.get("/developers/..%2f..%2fpackage.json", {
+      headers: { host: apexHost() },
+    });
+    expect([400, 403, 404]).toContain(res.status);
+  });
+});
+
 describe("canonical host redirects", () => {
   it("should redirect to the current subdomain when a previous one is used", async () => {
     const id = randomUUID();
