@@ -2,7 +2,7 @@ export class UrlHelper {
   public static github = "https://www.github.com/outline/outline/issues";
   public static twitter = "https://twitter.com/getoutline";
   public static contact = "https://www.getoutline.com/contact";
-  public static developers = "https://www.getoutline.com/developers";
+  public static developers = "/developers";
   public static changelog = "https://www.getoutline.com/changelog";
   public static guide = "https://docs.getoutline.com/s/guide";
 

@@ -9,6 +9,7 @@ import PaginatedList from "~/components/PaginatedList";
 import Scene from "~/components/Scene";
 import Text from "~/components/Text";
 import { createOAuthClient } from "~/actions/definitions/oauthClients";
+import { UrlHelper } from "@shared/utils/UrlHelper";
 import useCurrentTeam from "~/hooks/useCurrentTeam";
 import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
@@ -46,11 +47,7 @@ function Applications() {
           values={{ appName: env.APP_NAME }}
           components={{
             em: (
-              <a
-                href="https://www.getoutline.com/developers"
-                target="_blank"
-                rel="noreferrer"
-              />
+              <a href={UrlHelper.developers} target="_blank" rel="noreferrer" />
             ),
           }}
         />

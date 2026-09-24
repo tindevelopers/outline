@@ -11,6 +11,7 @@ import Scene from "~/components/Scene";
 import Text from "~/components/Text";
 import { createApiKey } from "~/actions/definitions/apiKeys";
 import env from "~/env";
+import { UrlHelper } from "@shared/utils/UrlHelper";
 import useCurrentTeam from "~/hooks/useCurrentTeam";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import usePolicy from "~/hooks/usePolicy";
@@ -54,7 +55,7 @@ function APIAndAccess() {
             components={{
               em: (
                 <a
-                  href="https://www.getoutline.com/developers"
+                  href={UrlHelper.developers}
                   target="_blank"
                   rel="noreferrer"
                 />

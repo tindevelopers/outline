@@ -13,6 +13,7 @@ import InputSearch from "~/components/InputSearch";
 import Scene from "~/components/Scene";
 import Text from "~/components/Text";
 import { createApiKey } from "~/actions/definitions/apiKeys";
+import { UrlHelper } from "@shared/utils/UrlHelper";
 import useCurrentTeam from "~/hooks/useCurrentTeam";
 import usePolicy from "~/hooks/usePolicy";
 import useQuery from "~/hooks/useQuery";
@@ -124,11 +125,7 @@ function ApiKeys() {
           your workspace's data. For more details see the <em>developer documentation</em>."
           components={{
             em: (
-              <a
-                href="https://www.getoutline.com/developers"
-                target="_blank"
-                rel="noreferrer"
-              />
+              <a href={UrlHelper.developers} target="_blank" rel="noreferrer" />
             ),
           }}
         />
