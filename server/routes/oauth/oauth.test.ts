@@ -3,14 +3,15 @@ import sharedEnv from "@shared/env";
 import { TeamPreference } from "@shared/types";
 import { OAuthClientValidation } from "@shared/validations";
 import env from "@server/env";
-import { OAuthClient } from "@server/models";
+import { OAuthClient, Team } from "@server/models";
 import {
   buildApiKey,
   buildOAuthClient,
   buildTeam,
   buildUser,
 } from "@server/test/factories";
-import { getTestServer } from "@server/test/support";
+import { getTestServer, setSelfHosted } from "@server/test/support";
+import { resetVaultModeCache } from "@server/utils/vault";
 
 const server = getTestServer();
 
@@ -669,5 +670,114 @@ describe("POST /oauth/authorize", () => {
 
     expect(res.status).toEqual(302);
     expect(res.headers.get("location")).toContain("code=");
+  });
+});
+
+describe("GET /oauth/authorize on the vault apex", () => {
+  const apexHost = () => new URL(env.URL).host;
+  const mockVaultMode = () =>
+    vi
+      .spyOn(Team, "count")
+      .mockImplementation(async (options) => (options?.where ? 0 : 2));
+  const query = (clientId: string) =>
+    `client_id=${clientId}&redirect_uri=https%3A%2F%2Fexample.com%2Fcb&response_type=code&state=xyz`;
+
+  beforeEach(() => {
+    setSelfHosted();
+    resetVaultModeCache();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetVaultModeCache();
+  });
+
+  it("hands off to the client's own workspace with the query intact", async () => {
+    const team = await buildTeam({ subdomain: faker.internet.domainWord() });
+    const client = await buildOAuthClient({ teamId: team.id });
+    mockVaultMode();
+
+    const res = await server.get(`/oauth/authorize?${query(client.clientId)}`, {
+      headers: { host: apexHost() },
+      redirect: "manual",
+    });
+
+    expect(res.status).toEqual(302);
+    expect(res.headers.get("location")).toEqual(
+      `${team.url}/oauth/authorize?${query(client.clientId)}`
+    );
+    expect(new URL(team.url).host).not.toEqual(apexHost());
+  });
+
+  it("falls through for an unknown client", async () => {
+    mockVaultMode();
+
+    const res = await server.get(`/oauth/authorize?${query("nope")}`, {
+      headers: { host: apexHost() },
+      redirect: "manual",
+    });
+
+    expect(res.status).toEqual(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("falls through for a deleted client", async () => {
+    const team = await buildTeam({ subdomain: faker.internet.domainWord() });
+    const client = await buildOAuthClient({ teamId: team.id });
+    await client.destroy();
+    mockVaultMode();
+
+    const res = await server.get(`/oauth/authorize?${query(client.clientId)}`, {
+      headers: { host: apexHost() },
+      redirect: "manual",
+    });
+
+    expect(res.status).toEqual(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("falls through for a suspended workspace", async () => {
+    const team = await buildTeam({
+      subdomain: faker.internet.domainWord(),
+      suspendedAt: new Date(),
+    });
+    const client = await buildOAuthClient({ teamId: team.id });
+    mockVaultMode();
+
+    const res = await server.get(`/oauth/authorize?${query(client.clientId)}`, {
+      headers: { host: apexHost() },
+      redirect: "manual",
+    });
+
+    expect(res.status).toEqual(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("falls through for a team without a subdomain", async () => {
+    const team = await buildTeam();
+    const client = await buildOAuthClient({ teamId: team.id });
+    mockVaultMode();
+
+    const res = await server.get(`/oauth/authorize?${query(client.clientId)}`, {
+      headers: { host: apexHost() },
+      redirect: "manual",
+    });
+
+    expect(res.status).toEqual(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("does nothing on a workspace host", async () => {
+    const team = await buildTeam({ subdomain: faker.internet.domainWord() });
+    const client = await buildOAuthClient({ teamId: team.id });
+    mockVaultMode();
+
+    const res = await server.get(`/oauth/authorize?${query(client.clientId)}`, {
+      headers: { host: `${team.subdomain}.${apexHost()}` },
+      redirect: "manual",
+    });
+
+    expect(res.status).toEqual(200);
+    expect(res.headers.get("location")).toBeNull();
   });
 });

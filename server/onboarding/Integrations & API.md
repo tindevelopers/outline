@@ -16,14 +16,14 @@ If your team is using Slack to communicate then you’ll definitely want to enab
 
 ## API
 
-Have some technical skills? TIN Vault is built on a fully featured RPC-style [API](https://www.getoutline.com/developers). Create (or even append to) documents, collections, provision users, and more programmatically. All documents are edited and stored in markdown format – try out this example CURL request to get started:
+Have some technical skills? TIN Vault is built on a fully featured RPC-style [API](https://docs.tin.info/developers). Create (or even append to) documents, collections, provision users, and more programmatically. All documents are edited and stored in markdown format – try out this example CURL request to get started:
 
 ```bash
 curl -XPOST -H "Content-type: application/json" -d '{
   "title": "My first document",
   "text": "Hello from the API 👋",
   "collectionId": "COLLECTION_ID", // find the collection id in the URL bar
-  "token": "API_TOKEN", // get an API token from https://www.getoutline.com/settings/tokens
+  "token": "API_TOKEN", // get an API token from Settings → API & Apps in your workspace
   "publish": true
-}' 'https://www.getoutline.com/api/documents.create'
+}' 'https://docs.tin.info/api/documents.create'
 ```

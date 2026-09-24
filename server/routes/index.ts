@@ -152,6 +152,28 @@ router.get("/sitemap.xml", async (ctx) => {
   }
 });
 
+// First-party TIN Vault API portal. Apex only, so "Try it" is same-origin
+// with /api and needs no CORS or proxy; workspace hosts redirect there.
+router.get(["/developers", "/developers/*"], async (ctx) => {
+  if (ctx.hostname !== new URL(env.URL).hostname) {
+    ctx.redirect(`${env.URL}${ctx.path}${ctx.search}`);
+    return;
+  }
+  const file =
+    ctx.path === "/developers" || ctx.path === "/developers/"
+      ? "/developers/index.html"
+      : ctx.path;
+  await send(ctx, file, {
+    // __dirname-relative counting breaks between the ts-node/vitest source
+    // tree and the compiled build/server/routes tree (see the /images
+    // middleware above, which is only ever exercised in the built app).
+    // process.cwd() is the repo root (dev, test and the Docker WORKDIR
+    // alike), so it resolves public/ correctly in all three.
+    root: path.resolve(process.cwd(), "public"),
+    maxAge: file.endsWith(".html") ? 0 : Day.ms,
+  });
+});
+
 // catch all for application
 router.get("*", async (ctx, next) => {
   if (isInvalidAppPath(ctx.path)) {
