@@ -13,7 +13,7 @@ export default function OutlineIcon({ size = 24 }: Props) {
   return (
     <img
       alt=""
-      src={cdnPath("/images/icon-192.png?v=tin-vault-20260918")}
+      src={cdnPath("/images/icon-192.png?v=tin-kb-20260927")}
       width={size}
       height={size}
     />
