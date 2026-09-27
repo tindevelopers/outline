@@ -126,7 +126,7 @@ type BaseEvent<T extends Model> = {
 };
 
 export type ApiKeyEvent = BaseEvent<ApiKey> & {
-  name: "api_keys.create" | "api_keys.delete";
+  name: "api_keys.create" | "api_keys.delete" | "api_keys.regenerate";
   modelId: string;
   data: {
     name: string;

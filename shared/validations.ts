@@ -53,6 +53,11 @@ export const ApiKeyValidation = {
   minNameLength: 3,
   /** The maximum length of the API key name */
   maxNameLength: 255,
+  /**
+   * The number of hours a replaced API key secret remains valid after the key
+   * is regenerated, when a grace period is requested.
+   */
+  gracePeriodHours: 48,
 };
 
 export const CollectionValidation = {

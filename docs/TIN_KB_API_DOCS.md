@@ -28,6 +28,11 @@ If the script exits with `branding left in output: ...`, add a targeted
 `.replace()` for the reported string in `scripts/openapi/build-tin-kb-spec.mjs`
 and re-run. Never remove or weaken that guard.
 
+The script also injects the fork-only `apiKeys.regenerate` path and the
+`previousHashExpiresAt` field on the `ApiKey` schema, because upstream has no
+key rotation. Do not hand-edit those into `openapi.yaml`: a sync would drop
+them. They live in the script, and the guard covers their branding too.
+
 `outline/openapi@main` tracks Outline's latest API, which may be ahead of the
 Outline version this fork has merged. Review the spec diff against the
 fork's `server/routes/api` changes before committing a sync.

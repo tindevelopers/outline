@@ -30,6 +30,9 @@ class ApiKey extends Model implements Searchable {
   /** Timestamp that the API key was last used. */
   @observable
   lastActiveAt?: string = undefined;
+  /** Timestamp that the replaced secret stops authenticating, if a grace period is active. */
+  @observable
+  previousHashExpiresAt?: string = undefined;
   /** The user who this API key belongs to. */
   @Relation(() => User)
   user: User;
@@ -47,6 +50,14 @@ class ApiKey extends Model implements Searchable {
   @computed
   get isExpired() {
     return this.expiresAt ? isPast(new Date(this.expiresAt)) : false;
+  }
+
+  /** Whether a previously replaced secret is still within its grace period. */
+  @computed
+  get hasActiveGracePeriod() {
+    return this.previousHashExpiresAt
+      ? !isPast(new Date(this.previousHashExpiresAt))
+      : false;
   }
 
   @computed

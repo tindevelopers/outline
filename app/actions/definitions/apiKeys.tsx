@@ -1,10 +1,11 @@
 import copy from "copy-to-clipboard";
-import { CopyIcon, PlusIcon, TrashIcon } from "outline-icons";
+import { CopyIcon, PlusIcon, ReplaceIcon, TrashIcon } from "outline-icons";
 import { toast } from "sonner";
 import stores from "~/stores";
 import env from "~/env";
 import type ApiKey from "~/models/ApiKey";
 import ApiKeyNew from "~/scenes/ApiKeyNew";
+import ApiKeyRegenerateDialog from "~/scenes/Settings/components/ApiKeyRegenerateDialog";
 import ApiKeyRevokeDialog from "~/scenes/Settings/components/ApiKeyRevokeDialog";
 import { createAction } from "..";
 import { dialogActionFactory } from "./common";
@@ -36,6 +37,32 @@ export const copyApiKeyActionFactory = ({ apiKey }: { apiKey: ApiKey }) =>
         format: "text/plain",
       });
       toast.success(t("API key copied"));
+    },
+  });
+
+export const regenerateApiKeyActionFactory = ({ apiKey }: { apiKey: ApiKey }) =>
+  createAction({
+    name: ({ t, isMenu }) =>
+      isMenu ? `${t("Regenerate")}…` : t("Regenerate API key"),
+    analyticsName: "Regenerate API key",
+    section: SettingsSection,
+    icon: <ReplaceIcon />,
+    keywords: "regenerate rotate replace",
+    dangerous: true,
+    visible: () => !apiKey.isExpired,
+    perform: ({ t, event }) => {
+      event?.preventDefault();
+      event?.stopPropagation();
+
+      stores.dialogs.openModal({
+        title: t("Regenerate API key"),
+        content: (
+          <ApiKeyRegenerateDialog
+            onSubmit={stores.dialogs.closeAllModals}
+            apiKey={apiKey}
+          />
+        ),
+      });
     },
   });
 

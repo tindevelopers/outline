@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   copyApiKeyActionFactory,
+  regenerateApiKeyActionFactory,
   revokeApiKeyActionFactory,
 } from "~/actions/definitions/apiKeys";
 import type ApiKey from "~/models/ApiKey";
@@ -16,6 +17,7 @@ export function useApiKeyMenuActions(apiKey: ApiKey) {
   const actions = useMemo(
     () => [
       copyApiKeyActionFactory({ apiKey }),
+      regenerateApiKeyActionFactory({ apiKey }),
       revokeApiKeyActionFactory({ apiKey }),
     ],
     [apiKey]

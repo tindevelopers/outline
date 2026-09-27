@@ -1,3 +1,5 @@
+import { subHours } from "date-fns";
+import { ApiKey } from "@server/models";
 import {
   buildAdmin,
   buildApiKey,
@@ -328,6 +330,161 @@ describe("#apiKeys.delete", () => {
 
   it("should require authentication", async () => {
     const res = await server.post("/api/apiKeys.delete");
+    expect(res.status).toEqual(401);
+  });
+});
+
+describe("#apiKeys.regenerate", () => {
+  it("should rotate the secret and invalidate the previous one immediately", async () => {
+    const user = await buildUser();
+    const apiKey = await buildApiKey({ userId: user.id });
+    const previous = apiKey.value!;
+
+    const res = await server.post("/api/apiKeys.regenerate", user, {
+      body: {
+        id: apiKey.id,
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data.value).toBeTruthy();
+    expect(body.data.value).not.toEqual(previous);
+    expect(body.data.previousHashExpiresAt).toBeNull();
+
+    const current = await server.post("/api/auth.info", {
+      headers: { Authorization: `Bearer ${body.data.value}` },
+    });
+    expect(current.status).toEqual(200);
+
+    const stale = await server.post("/api/auth.info", {
+      headers: { Authorization: `Bearer ${previous}` },
+    });
+    expect(stale.status).toEqual(401);
+  });
+
+  it("should retain the previous secret when a grace period is requested", async () => {
+    const user = await buildUser();
+    const apiKey = await buildApiKey({ userId: user.id });
+    const previous = apiKey.value!;
+
+    const res = await server.post("/api/apiKeys.regenerate", user, {
+      body: {
+        id: apiKey.id,
+        gracePeriod: true,
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data.previousHashExpiresAt).toBeTruthy();
+
+    const stale = await server.post("/api/auth.info", {
+      headers: { Authorization: `Bearer ${previous}` },
+    });
+    expect(stale.status).toEqual(200);
+  });
+
+  it("should reject the previous secret once the grace period has passed", async () => {
+    const user = await buildUser();
+    const apiKey = await buildApiKey({ userId: user.id });
+    const previous = apiKey.value!;
+
+    await server.post("/api/apiKeys.regenerate", user, {
+      body: {
+        id: apiKey.id,
+        gracePeriod: true,
+      },
+    });
+
+    const row = await ApiKey.findByPk(apiKey.id, { rejectOnEmpty: true });
+    row.previousHashExpiresAt = subHours(new Date(), 1);
+    await row.save({ silent: true });
+
+    const stale = await server.post("/api/auth.info", {
+      headers: { Authorization: `Bearer ${previous}` },
+    });
+    expect(stale.status).toEqual(401);
+  });
+
+  it("should preserve the name, scopes and expiry", async () => {
+    const user = await buildUser();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
+    const apiKey = await buildApiKey({
+      userId: user.id,
+      name: "Production key",
+      scope: ["/api/documents.info"],
+      expiresAt,
+    });
+
+    const res = await server.post("/api/apiKeys.regenerate", user, {
+      body: {
+        id: apiKey.id,
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data.name).toEqual("Production key");
+    expect(body.data.scope).toEqual(["/api/documents.info"]);
+    expect(body.data.expiresAt).toEqual(expiresAt.toISOString());
+  });
+
+  it("should not allow regenerating another user's api key", async () => {
+    const user = await buildUser();
+    const otherUser = await buildUser({ teamId: user.teamId });
+    const apiKey = await buildApiKey({ userId: otherUser.id });
+
+    const res = await server.post("/api/apiKeys.regenerate", user, {
+      body: {
+        id: apiKey.id,
+      },
+    });
+
+    expect(res.status).toEqual(403);
+  });
+
+  it("should allow admin to regenerate another user's api key", async () => {
+    const user = await buildUser();
+    const admin = await buildAdmin({ teamId: user.teamId });
+    const apiKey = await buildApiKey({ userId: user.id });
+
+    const res = await server.post("/api/apiKeys.regenerate", admin, {
+      body: {
+        id: apiKey.id,
+      },
+    });
+
+    expect(res.status).toEqual(200);
+  });
+
+  it("should allow viewers to regenerate their own api key", async () => {
+    const viewer = await buildViewer();
+    const apiKey = await buildApiKey({ userId: viewer.id });
+
+    const res = await server.post("/api/apiKeys.regenerate", viewer, {
+      body: {
+        id: apiKey.id,
+      },
+    });
+
+    expect(res.status).toEqual(200);
+  });
+
+  it("should require a valid key id", async () => {
+    const user = await buildUser();
+
+    const res = await server.post("/api/apiKeys.regenerate", user, {
+      body: {
+        id: "not-a-uuid",
+      },
+    });
+
+    expect(res.status).toEqual(400);
+  });
+
+  it("should require authentication", async () => {
+    const res = await server.post("/api/apiKeys.regenerate");
     expect(res.status).toEqual(401);
   });
 });

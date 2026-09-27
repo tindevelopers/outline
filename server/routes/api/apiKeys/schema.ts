@@ -76,3 +76,17 @@ export const APIKeysDeleteSchema = BaseSchema.extend({
 });
 
 export type APIKeysDeleteReq = z.infer<typeof APIKeysDeleteSchema>;
+
+export const APIKeysRegenerateSchema = BaseSchema.extend({
+  body: z.object({
+    /** API Key Id */
+    id: z.uuid(),
+    /**
+     * Whether to keep the replaced secret valid for a grace period, so that
+     * consumers can be updated before it stops working.
+     */
+    gracePeriod: z.boolean().prefault(false),
+  }),
+});
+
+export type APIKeysRegenerateReq = z.infer<typeof APIKeysRegenerateSchema>;

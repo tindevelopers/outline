@@ -1,6 +1,9 @@
+import { addHours, subHours } from "date-fns";
 import { randomString } from "@shared/random";
 import { Scope } from "@shared/types";
-import { buildApiKey } from "@server/test/factories";
+import { buildApiKey, buildUser } from "@server/test/factories";
+import { withAPIContext } from "@server/test/support";
+import { hash } from "@server/utils/crypto";
 import ApiKey from "./ApiKey";
 
 describe("#ApiKey", () => {
@@ -163,6 +166,86 @@ describe("#ApiKey", () => {
         "/api/users.info",
         Scope.Write,
       ]);
+    });
+  });
+
+  describe("findByToken with a previous secret", () => {
+    it("should find by the previous hash within the grace period", async () => {
+      const apiKey = await buildApiKey();
+      const previous = `${ApiKey.prefix}${randomString(38)}`;
+      apiKey.previousHash = hash(previous);
+      apiKey.previousHashExpiresAt = addHours(new Date(), 1);
+      await apiKey.save();
+
+      const found = await ApiKey.findByToken(previous);
+      expect(found?.id).toEqual(apiKey.id);
+    });
+
+    it("should not find by the previous hash after the grace period", async () => {
+      const apiKey = await buildApiKey();
+      const previous = `${ApiKey.prefix}${randomString(38)}`;
+      apiKey.previousHash = hash(previous);
+      apiKey.previousHashExpiresAt = subHours(new Date(), 1);
+      await apiKey.save();
+
+      expect(await ApiKey.findByToken(previous)).toBeFalsy();
+    });
+
+    it("should not find by the previous hash when no expiry is set", async () => {
+      const apiKey = await buildApiKey();
+      const previous = `${ApiKey.prefix}${randomString(38)}`;
+      apiKey.previousHash = hash(previous);
+      apiKey.previousHashExpiresAt = null;
+      await apiKey.save();
+
+      expect(await ApiKey.findByToken(previous)).toBeFalsy();
+    });
+  });
+
+  describe("rotate", () => {
+    it("should replace the secret and discard the previous one immediately", async () => {
+      const user = await buildUser();
+      const apiKey = await buildApiKey({ userId: user.id });
+      const previous = apiKey.value!;
+
+      await withAPIContext(user, (ctx) => apiKey.rotate(ctx, 0));
+
+      expect(apiKey.value).not.toEqual(previous);
+      expect(apiKey.previousHash).toBeNull();
+      expect(apiKey.previousHashExpiresAt).toBeNull();
+      expect(await ApiKey.findByToken(previous)).toBeFalsy();
+      expect(await ApiKey.findByToken(apiKey.value!)).toBeTruthy();
+    });
+
+    it("should retain the previous secret for the grace period", async () => {
+      const user = await buildUser();
+      const apiKey = await buildApiKey({ userId: user.id });
+      const previous = apiKey.value!;
+
+      await withAPIContext(user, (ctx) => apiKey.rotate(ctx, 48));
+
+      expect(apiKey.value).not.toEqual(previous);
+      expect(apiKey.previousHash).toBeTruthy();
+      expect(apiKey.previousHashExpiresAt).toBeInstanceOf(Date);
+      expect(apiKey.previousHashExpiresAt!.getTime()).toBeGreaterThan(
+        Date.now()
+      );
+      const found = await ApiKey.findByToken(previous);
+      expect(found?.id).toEqual(apiKey.id);
+    });
+
+    it("should discard the first previous secret on a second rotation", async () => {
+      const user = await buildUser();
+      const apiKey = await buildApiKey({ userId: user.id });
+      const first = apiKey.value!;
+
+      await withAPIContext(user, (ctx) => apiKey.rotate(ctx, 48));
+      const second = apiKey.value!;
+      await withAPIContext(user, (ctx) => apiKey.rotate(ctx, 48));
+
+      expect(await ApiKey.findByToken(first)).toBeFalsy();
+      expect(await ApiKey.findByToken(second)).toBeTruthy();
+      expect(await ApiKey.findByToken(apiKey.value!)).toBeTruthy();
     });
   });
 });
