@@ -1,4 +1,4 @@
-# TIN Vault API specification, derived from outline/openapi@40f51b75efad.
+# TIN KB API specification, derived from outline/openapi@40f51b75efad.
 # Original work licensed as follows:
 # BSD 3-Clause License
 #
@@ -32,12 +32,12 @@
 #
 openapi: 3.0.0
 info:
-  title: TIN Vault API
+  title: TIN KB API
   description: |
     # Introduction
 
-    The TIN Vault API is structured in an RPC style. It enables you to
-    programatically interact with all aspects of TIN Vault’s data – in fact, the
+    The TIN KB API is structured in an RPC style. It enables you to
+    programatically interact with all aspects of TIN KB’s data – in fact, the
     main application is built on exactly the same API.
 
     The API structure is available as an
@@ -46,7 +46,7 @@ info:
 
     # Making requests
 
-    TIN Vault’s API follows simple RPC style conventions where each API endpoint is
+    TIN KB’s API follows simple RPC style conventions where each API endpoint is
     a `POST` method on `https://docs.tin.info/api/:method`. Only HTTPS is
     supported and all response payloads are JSON.
 
@@ -60,7 +60,7 @@ info:
     -H 'authorization: Bearer MY_API_KEY' \
     -H 'content-type: application/json' \
     -H 'accept: application/json' \
-    -d '{"id": "tin-vault-api-NTpezNwhUP"}'
+    -d '{"id": "tin-kb-api-NTpezNwhUP"}'
     ```
 
     Or, with JavaScript:
@@ -174,7 +174,7 @@ info:
 
     # Rate limits
 
-    Like most APIs, TIN Vault has rate limits in place to prevent abuse. Endpoints
+    Like most APIs, TIN KB has rate limits in place to prevent abuse. Endpoints
     that mutate data are more restrictive than read-only endpoints. If you exceed
     the rate limit for a given endpoint, you will receive a `429 Too Many Requests`
     status code.
@@ -194,14 +194,14 @@ info:
     be used in an interface to adjust which elements are visible.
   version: 0.1.0
   contact:
-    name: TIN Vault Support
+    name: TIN KB Support
     email: support.docs@tin.info
   license:
     name: BSD-3-Clause (specification derived from the Outline OpenAPI spec)
     url: https://docs.tin.info/developers/LICENSES/outline-openapi-BSD-3-Clause.txt
 servers:
   - url: https://docs.tin.info/api
-    description: TIN Vault (all workspaces)
+    description: TIN KB (all workspaces)
 security:
   - BearerAuth: []
   - OAuth2:
@@ -276,7 +276,7 @@ tags:
   - name: OAuthAuthentications
     description: |
       `OAuthAuthentications` represent individual scoped authentications between
-      TIN Vault and an `OAuthClient`.
+      TIN KB and an `OAuthClient`.
   - name: OAuthClients
     description: |
       `OAuthClients` represent OAuth clients that can be used to authenticate
@@ -5370,7 +5370,7 @@ paths:
                   type: string
                   maxLength: 255
                   description: A short description of this OAuth client.
-                  example: Integrate Acme Inc's services into TIN Vault.
+                  example: Integrate Acme Inc's services into TIN KB.
                 developerName:
                   type: string
                   maxLength: 100
@@ -5446,7 +5446,7 @@ paths:
                   type: string
                   maxLength: 255
                   description: A short description of this OAuth client.
-                  example: Integrate Acme Inc's services into TIN Vault.
+                  example: Integrate Acme Inc's services into TIN KB.
                 developerName:
                   type: string
                   maxLength: 100
@@ -7762,7 +7762,7 @@ paths:
                   format: uri
                   maxLength: 1024
                   description: The URL that receives webhook requests. Cloud-hosted workspaces require an HTTPS URL.
-                  example: https://example.com/webhooks/tin-vault
+                  example: https://example.com/webhooks/tin-kb
                 secret:
                   type: string
                   nullable: true
@@ -7825,7 +7825,7 @@ paths:
                   format: uri
                   maxLength: 1024
                   description: The URL that receives webhook requests. Cloud-hosted workspaces require an HTTPS URL.
-                  example: https://example.com/webhooks/tin-vault
+                  example: https://example.com/webhooks/tin-kb
                 secret:
                   type: string
                   nullable: true
@@ -8888,7 +8888,7 @@ components:
           type: string
           nullable: true
           description: A short description of this OAuth client.
-          example: Integrate Acme Inc's services into TIN Vault.
+          example: Integrate Acme Inc's services into TIN KB.
         developerName:
           type: string
           nullable: true
@@ -9627,7 +9627,7 @@ components:
           format: uri
           maxLength: 1024
           description: The URL that receives webhook requests.
-          example: https://example.com/webhooks/tin-vault
+          example: https://example.com/webhooks/tin-kb
         secret:
           type: string
           nullable: true

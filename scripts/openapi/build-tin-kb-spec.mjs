@@ -1,15 +1,21 @@
-// Rebrands Outline's OpenAPI spec as the TIN Vault API. Usage:
-//   node scripts/openapi/build-tin-vault-spec.mjs <upstream spec3.yml> <commit>
-// Writes public/developers/openapi.yaml and openapi.upstream.json. Exits 1
-// if any Outline branding or getoutline.com URL survives the rewrite.
+// Rebrands Outline's OpenAPI spec as the TIN KB API. Usage:
+//   node scripts/openapi/build-tin-kb-spec.mjs <upstream spec3.yml> [commit]
+// Writes public/developers/openapi.yaml and openapi.upstream.json. The commit
+// defaults to the pin recorded in openapi.upstream.json. Exits 1 if any
+// Outline branding, getoutline.com URL, or stale TIN Vault branding survives
+// the rewrite.
 import fs from "node:fs";
 import yaml from "js-yaml";
 
-const [input, commit] = process.argv.slice(2);
-if (!input || !commit) {
-  console.error("usage: build-tin-vault-spec.mjs <spec3.yml> <commit>");
+const [input, commitArg] = process.argv.slice(2);
+if (!input) {
+  console.error("usage: build-tin-kb-spec.mjs <spec3.yml> [commit]");
   process.exit(1);
 }
+const pin = JSON.parse(
+  fs.readFileSync("public/developers/openapi.upstream.json", "utf8")
+);
+const commit = commitArg ?? pin.commit;
 
 const BASE = "https://docs.tin.info";
 const rewrite = (s) =>
@@ -29,13 +35,13 @@ const rewrite = (s) =>
       /https:\/\/github\.com\/outline\/openapi\/blob\/main\/LICENSE/g,
       `${BASE}/developers/LICENSES/outline-openapi-BSD-3-Clause.txt`
     )
-    .replace(/\bOutline API\b/g, "TIN Vault API")
-    .replace(/\bOutline(’|')s\b/g, "TIN Vault$1s")
-    .replace(/\bOutline\b/g, "TIN Vault")
+    .replace(/\bOutline API\b/g, "TIN KB API")
+    .replace(/\bOutline(’|')s\b/g, "TIN KB$1s")
+    .replace(/\bOutline\b/g, "TIN KB")
     // Example values and prose only. Real API values such as the
     // `outline-markdown` export format must stay as they are.
-    .replace(/\boutline-api-/g, "tin-vault-api-")
-    .replace(/\/webhooks\/outline\b/g, "/webhooks/tin-vault")
+    .replace(/\boutline-api-/g, "tin-kb-api-")
+    .replace(/\/webhooks\/outline\b/g, "/webhooks/tin-kb")
     .replace(/in the outline-icons package/g, "from the built-in icon set")
     .replace(/from the outline-icons package/g, "from the built-in icon set");
 
@@ -52,13 +58,13 @@ const walk = (v) =>
 
 const spec = walk(yaml.load(fs.readFileSync(input, "utf8")));
 
-spec.info.title = "TIN Vault API";
+spec.info.title = "TIN KB API";
 spec.info.contact = {
-  name: "TIN Vault Support",
+  name: "TIN KB Support",
   email: "support.docs@tin.info",
 };
 spec.servers = [
-  { url: `${BASE}/api`, description: "TIN Vault (all workspaces)" },
+  { url: `${BASE}/api`, description: "TIN KB (all workspaces)" },
 ];
 const schemes = spec.components.securitySchemes;
 schemes.BearerAuth.bearerFormat = "API key (ol_api_…) or OAuth access token";
@@ -72,7 +78,9 @@ code.refreshUrl = `${BASE}/oauth/token`;
 // so it must not trip the "branding left in output" check. Every other field
 // has been rewritten by here, so this still catches any real leftover.
 const preLicenseBody = yaml.dump(spec, { lineWidth: -1, noRefs: true });
-const leftovers = preLicenseBody.match(/getoutline\.com|\bOutline\b/g);
+const leftovers = preLicenseBody.match(
+  /getoutline\.com|\bOutline\b|\bTIN Vault\b/g
+);
 if (leftovers) {
   console.error(
     `branding left in output: ${[...new Set(leftovers)].join(", ")}`
@@ -97,7 +105,7 @@ const notice = fs
   .join("\n");
 fs.writeFileSync(
   "public/developers/openapi.yaml",
-  `# TIN Vault API specification, derived from outline/openapi@${commit}.\n# Original work licensed as follows:\n${notice}\n${body}`
+  `# TIN KB API specification, derived from outline/openapi@${commit}.\n# Original work licensed as follows:\n${notice}\n${body}`
 );
 fs.writeFileSync(
   "public/developers/openapi.upstream.json",

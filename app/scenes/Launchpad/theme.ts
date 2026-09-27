@@ -1,6 +1,6 @@
 /**
- * Design tokens for the TIN Vault Launchpad, mirroring
- * design/tin-vault-launchpad/base.css. One accent (TIN orange), navy
+ * Design tokens for the TIN KB Launchpad, mirroring
+ * design/tin-kb-launchpad/base.css. One accent (TIN orange), navy
  * surfaces, locked radii: 10px controls, 14px surfaces.
  */
 export const vaultTheme = {

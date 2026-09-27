@@ -206,7 +206,7 @@ export function BrandPanel() {
       </div>
 
       <div className="copy">
-        <span className="eyebrow">{t("TIN VAULT")}</span>
+        <span className="eyebrow">{t("TIN KB")}</span>
         <h2>
           {t("Your team’s knowledge,")}
           <br />

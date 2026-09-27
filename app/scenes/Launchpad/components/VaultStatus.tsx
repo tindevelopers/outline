@@ -150,7 +150,7 @@ export function VaultStatus(props: Props) {
           <h2>{t("No workspaces yet")}</h2>
           <p className="lead">
             {t(
-              "You are signed in as {{ email }}. That account is not a member of any TIN Vault workspace. A workspace administrator can grant access.",
+              "You are signed in as {{ email }}. That account is not a member of any TIN KB workspace. A workspace administrator can grant access.",
               { email: props.email }
             )}
           </p>

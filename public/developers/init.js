@@ -1,9 +1,9 @@
-// TIN Vault API portal: Scalar configured for first-party use only.
+// TIN KB API portal: Scalar configured for first-party use only.
 // No proxyUrl (API keys never leave this origin), no external fonts,
 // no AI agent. Servers are pinned to this origin so "Try it" is same-origin.
 Scalar.createApiReference("#app", {
   url: "/developers/openapi.yaml",
-  servers: [{ url: `${location.origin}/api`, description: "TIN Vault" }],
+  servers: [{ url: `${location.origin}/api`, description: "TIN KB" }],
   withDefaultFonts: false,
   agent: { disabled: true },
   // Keep users on this origin: no link to Scalar's hosted API client (where a
@@ -11,7 +11,7 @@ Scalar.createApiReference("#app", {
   hideClientButton: true,
   mcp: { disabled: true },
   authentication: { preferredSecurityScheme: "BearerAuth" },
-  metaData: { title: "TIN Vault API" },
+  metaData: { title: "TIN KB API" },
   favicon: "/images/favicon-32.png",
   hideDarkModeToggle: false,
   showDeveloperTools: "never",

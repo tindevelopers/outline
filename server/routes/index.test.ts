@@ -19,14 +19,14 @@ describe("/s/:id", () => {
     const res = await server.get(`/s/${share.id}`);
     const body = await res.text();
     expect(res.status).toEqual(404);
-    expect(body).toContain("<title>TIN Vault</title>");
+    expect(body).toContain("<title>TIN KB</title>");
   });
 
   it("should return standard title in html when share does not exist", async () => {
     const res = await server.get(`/s/junk`);
     const body = await res.text();
     expect(res.status).toEqual(404);
-    expect(body).toContain("<title>TIN Vault</title>");
+    expect(body).toContain("<title>TIN KB</title>");
   });
 
   it("should return standard title in html when document is deleted", async () => {
@@ -39,7 +39,7 @@ describe("/s/:id", () => {
     const res = await server.get(`/s/${share.id}`);
     const body = await res.text();
     expect(res.status).toEqual(404);
-    expect(body).toContain("<title>TIN Vault</title>");
+    expect(body).toContain("<title>TIN KB</title>");
   });
 
   it("should return document title in html when loading published share", async () => {
@@ -380,13 +380,13 @@ describe("scanner path 404s", () => {
 describe("/developers", () => {
   const apexHost = () => new URL(env.URL).host;
 
-  it("serves the TIN Vault API portal on the apex", async () => {
+  it("serves the TIN KB API portal on the apex", async () => {
     const res = await server.get("/developers", {
       headers: { host: apexHost() },
     });
     const html = await res.text();
     expect(res.status).toEqual(200);
-    expect(html).toContain("<title>TIN Vault API</title>");
+    expect(html).toContain("<title>TIN KB API</title>");
     expect(html).not.toMatch(/<script>(?!<\/script>)/); // no inline scripts, CSP stays strict
     expect(res.headers.get("access-control-allow-origin")).toBeNull();
   });
@@ -397,7 +397,7 @@ describe("/developers", () => {
     });
     const body = await res.text();
     expect(res.status).toEqual(200);
-    expect(body).toContain("title: TIN Vault API");
+    expect(body).toContain("title: TIN KB API");
     expect(body).not.toContain("app.getoutline.com");
   });
 

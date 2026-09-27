@@ -152,7 +152,7 @@ router.get("/sitemap.xml", async (ctx) => {
   }
 });
 
-// First-party TIN Vault API portal. Apex only, so "Try it" is same-origin
+// First-party TIN KB API portal. Apex only, so "Try it" is same-origin
 // with /api and needs no CORS or proxy; workspace hosts redirect there.
 router.get(["/developers", "/developers/*"], async (ctx) => {
   if (ctx.hostname !== new URL(env.URL).hostname) {

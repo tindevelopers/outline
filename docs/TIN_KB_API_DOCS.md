@@ -1,16 +1,16 @@
-# TIN Vault API docs
+# TIN KB API docs
 
-This documents how the TIN Vault API specification is vendored, kept in sync
+This documents how the TIN KB API specification is vendored, kept in sync
 with upstream Outline, and served.
 
 ## What is served
 
 | File | Purpose |
 | --- | --- |
-| `public/developers/openapi.yaml` | Generated. The TIN Vault–branded OpenAPI spec, derived from `outline/openapi` and rewritten by `scripts/openapi/build-tin-vault-spec.mjs`. Servers and OAuth URLs point at `https://docs.tin.info`. |
+| `public/developers/openapi.yaml` | Generated. The TIN KB–branded OpenAPI spec, derived from `outline/openapi` and rewritten by `scripts/openapi/build-tin-kb-spec.mjs`. Servers and OAuth URLs point at `https://docs.tin.info`. |
 | `public/developers/openapi.upstream.json` | Generated. Records which upstream commit `openapi.yaml` was built from and when. |
 | `public/developers/LICENSES/outline-openapi-BSD-3-Clause.txt` | Vendored copy of the upstream `outline/openapi` LICENSE (BSD-3-Clause), fetched at the same pinned commit. |
-| `scripts/openapi/build-tin-vault-spec.mjs` | The transform script. Rewrites Outline branding and `getoutline.com` URLs to TIN Vault / `docs.tin.info` equivalents, and fails if any branding survives. |
+| `scripts/openapi/build-tin-kb-spec.mjs` | The transform script. Rewrites Outline branding and `getoutline.com` URLs to TIN KB / `docs.tin.info` equivalents, and fails if any branding survives. |
 
 ## Syncing with upstream
 
@@ -20,12 +20,12 @@ Run this after every `upstream-sync/*` merge that touches `server/routes/api/**`
 C=$(gh api repos/outline/openapi/commits/main -q .sha | cut -c1-12)
 curl -fsSL "https://raw.githubusercontent.com/outline/openapi/$C/spec3.yml" -o /tmp/outline-spec3.yml
 curl -fsSL "https://raw.githubusercontent.com/outline/openapi/$C/LICENSE" -o public/developers/LICENSES/outline-openapi-BSD-3-Clause.txt
-node scripts/openapi/build-tin-vault-spec.mjs /tmp/outline-spec3.yml "$C"
-git diff --stat public/developers/   # review, then commit as "chore: sync TIN Vault API spec to outline/openapi@$C"
+node scripts/openapi/build-tin-kb-spec.mjs /tmp/outline-spec3.yml "$C"
+git diff --stat public/developers/   # review, then commit as "chore: sync TIN KB API spec to outline/openapi@$C"
 ```
 
 If the script exits with `branding left in output: ...`, add a targeted
-`.replace()` for the reported string in `scripts/openapi/build-tin-vault-spec.mjs`
+`.replace()` for the reported string in `scripts/openapi/build-tin-kb-spec.mjs`
 and re-run. Never remove or weaken that guard.
 
 `outline/openapi@main` tracks Outline's latest API, which may be ahead of the
