@@ -648,6 +648,49 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
       operationId: apiKeysDelete
+  /apiKeys.regenerate:
+    post:
+      tags:
+        - ApiKeys
+      summary: Regenerate an API key
+      description: Replace the secret value of an existing API key in place, preserving its name, scopes and expiry. The new secret `value` is only returned in this response and cannot be retrieved again. By default the previous secret stops working immediately; when `gracePeriod` is true it remains valid for 48 hours so consumers can be updated first.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier for the API key.
+                gracePeriod:
+                  type: boolean
+                  default: false
+                  description: Whether to keep the previous secret valid for 48 hours after regeneration.
+              required:
+                - id
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApiKey'
+        '400':
+          $ref: '#/components/responses/Validation'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      operationId: apiKeysRegenerate
   /attachments.create:
     post:
       tags:
@@ -9722,7 +9765,7 @@ components:
           readOnly: true
         value:
           type: string
-          description: The full secret value of the key. Only returned once, in the response to `apiKeys.create`.
+          description: The full secret value of the key. Only returned once, in the response to `apiKeys.create` or `apiKeys.regenerate`.
           readOnly: true
         expiresAt:
           type: string
@@ -9745,6 +9788,12 @@ components:
           format: date-time
           readOnly: true
           description: Date and time when this key was last updated.
+        previousHashExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+          description: Date and time when the secret replaced by `apiKeys.regenerate` stops authenticating, if a grace period is active.
     Pin:
       type: object
       properties:

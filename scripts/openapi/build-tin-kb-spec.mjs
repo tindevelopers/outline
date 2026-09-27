@@ -73,6 +73,94 @@ code.authorizationUrl = `${BASE}/oauth/authorize`;
 code.tokenUrl = `${BASE}/oauth/token`;
 code.refreshUrl = `${BASE}/oauth/token`;
 
+// The upstream spec describes outline/openapi, which has no key rotation, so
+// this fork's regenerate endpoint is injected here rather than hand-edited into
+// the generated openapi.yaml, which the next sync would overwrite. Passing the
+// fragment through walk() keeps the branding guard below covering it.
+const apiKeyPathKeys = Object.keys(spec.paths).filter((key) =>
+  key.startsWith("/apiKeys.")
+);
+if (apiKeyPathKeys.length === 0) {
+  console.error("no /apiKeys.* paths in upstream spec, cannot inject regenerate");
+  process.exit(1);
+}
+
+const regeneratePath = walk({
+  post: {
+    tags: ["ApiKeys"],
+    summary: "Regenerate an API key",
+    description:
+      "Replace the secret value of an existing API key in place, preserving its name, scopes and expiry. The new secret `value` is only returned in this response and cannot be retrieved again. By default the previous secret stops working immediately; when `gracePeriod` is true it remains valid for 48 hours so consumers can be updated first.", // keeps in step with ApiKeyValidation.gracePeriodHours
+    requestBody: {
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              id: {
+                type: "string",
+                format: "uuid",
+                description: "Unique identifier for the API key.",
+              },
+              gracePeriod: {
+                type: "boolean",
+                default: false,
+                description:
+                  "Whether to keep the previous secret valid for 48 hours after regeneration.",
+              },
+            },
+            required: ["id"],
+          },
+        },
+      },
+    },
+    responses: {
+      "200": {
+        description: "OK",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                data: { $ref: "#/components/schemas/ApiKey" },
+              },
+            },
+          },
+        },
+      },
+      "400": { $ref: "#/components/responses/Validation" },
+      "401": { $ref: "#/components/responses/Unauthenticated" },
+      "403": { $ref: "#/components/responses/Unauthorized" },
+      "404": { $ref: "#/components/responses/NotFound" },
+      "429": { $ref: "#/components/responses/RateLimited" },
+    },
+    operationId: "apiKeysRegenerate",
+  },
+});
+
+// Insert next to the other apiKeys paths rather than at the end of the
+// document, without reordering anything else.
+const pathEntries = Object.entries(spec.paths);
+const insertAt = pathEntries.reduce(
+  (offset, [key], index) => (key.startsWith("/apiKeys.") ? index + 1 : offset),
+  pathEntries.length
+);
+pathEntries.splice(insertAt, 0, ["/apiKeys.regenerate", regeneratePath]);
+spec.paths = Object.fromEntries(pathEntries);
+
+const apiKeySchema = spec.components.schemas.ApiKey;
+apiKeySchema.properties.value.description = rewrite(
+  "The full secret value of the key. Only returned once, in the response to `apiKeys.create` or `apiKeys.regenerate`."
+);
+apiKeySchema.properties.previousHashExpiresAt = walk({
+  type: "string",
+  format: "date-time",
+  nullable: true,
+  readOnly: true,
+  description:
+    "Date and time when the secret replaced by `apiKeys.regenerate` stops authenticating, if a grace period is active.",
+});
+
 // Guard runs before the license block below is added: that block deliberately
 // names "Outline" for BSD-3-Clause attribution (required by LICENSE terms),
 // so it must not trip the "branding left in output" check. Every other field

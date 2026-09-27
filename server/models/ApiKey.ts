@@ -1,4 +1,4 @@
-import { subMinutes } from "date-fns";
+import { addHours, subMinutes } from "date-fns";
 import type { InferAttributes, InferCreationAttributes } from "sequelize";
 import { Op } from "sequelize";
 import {
@@ -16,6 +16,7 @@ import {
 } from "sequelize-typescript";
 import { randomString } from "@shared/random";
 import { ApiKeyValidation } from "@shared/validations";
+import type { APIContext } from "@server/types";
 import { hash } from "@server/utils/crypto";
 import User from "./User";
 import ParanoidModel from "./base/ParanoidModel";
@@ -76,6 +77,22 @@ class ApiKey extends ParanoidModel<
   @SkipChangeset
   last4: string;
 
+  /**
+   * The hashed value of the secret that was replaced when this key was last
+   * regenerated. Retained to honor a grace period, and never returned to a
+   * client.
+   */
+  @Unique
+  @Column(DataType.STRING)
+  @SkipChangeset
+  previousHash: string | null;
+
+  /** The date and time when the previous secret stops authenticating */
+  @IsDate
+  @Column(DataType.DATE)
+  @SkipChangeset
+  previousHashExpiresAt: Date | null;
+
   /** The date and time when this API key will expire */
   @IsDate
   @Column(DataType.DATE)
@@ -102,8 +119,7 @@ class ApiKey extends ParanoidModel<
   @BeforeValidate
   public static async generateSecret(model: ApiKey) {
     if (!model.hash) {
-      const secret = `${ApiKey.prefix}${randomString(38)}`;
-      model.value = model.secret || secret;
+      model.value = model.secret || ApiKey.createSecret();
       model.hash = hash(model.value);
     }
   }
@@ -114,6 +130,15 @@ class ApiKey extends ParanoidModel<
     if (value) {
       model.last4 = value.slice(-4);
     }
+  }
+
+  /**
+   * Creates a new plain-text API key secret.
+   *
+   * @returns the secret, including the prefix used to identify API keys.
+   */
+  private static createSecret() {
+    return `${ApiKey.prefix}${randomString(38)}`;
   }
 
   /**
@@ -129,16 +154,24 @@ class ApiKey extends ParanoidModel<
   }
 
   /**
-   * Finds an API key by the given input string. This will check both the
-   * secret and hash fields.
+   * Finds an API key by the given input string. This will check the secret,
+   * the hash, and the previous hash while it is still within its grace period.
    *
    * @param input The input string to search for
    * @returns The API key if found
    */
   public static findByToken(input: string) {
+    const hashed = hash(input);
     return this.findOne({
       where: {
-        [Op.or]: [{ secret: input }, { hash: hash(input) }],
+        [Op.or]: [
+          { secret: input },
+          { hash: hashed },
+          {
+            previousHash: hashed,
+            previousHashExpiresAt: { [Op.gt]: new Date() },
+          },
+        ],
       },
     });
   }
@@ -153,6 +186,30 @@ class ApiKey extends ParanoidModel<
   userId: string;
 
   // methods
+
+  /**
+   * Rotates the secret of this API key in place, keeping its name, scopes and
+   * expiry. The outgoing secret is optionally retained for a grace period so
+   * that consumers can be updated before it stops working.
+   *
+   * @param ctx The API context.
+   * @param gracePeriodHours The number of hours the outgoing secret remains
+   * valid. Zero discards it immediately.
+   * @returns the saved API key, with the new plain-text `value` available.
+   */
+  public rotate(ctx: APIContext, gracePeriodHours: number) {
+    const previousHash = this.hash;
+    const secret = ApiKey.createSecret();
+
+    this.previousHash = gracePeriodHours > 0 ? previousHash : null;
+    this.previousHashExpiresAt =
+      gracePeriodHours > 0 ? addHours(new Date(), gracePeriodHours) : null;
+    this.value = secret;
+    this.hash = hash(secret);
+    this.last4 = secret.slice(-4);
+
+    return this.saveWithCtx(ctx, undefined, { name: "regenerate" });
+  }
 
   updateActiveAt = async () => {
     const fiveMinutesAgo = subMinutes(new Date(), 5);

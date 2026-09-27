@@ -74,6 +74,13 @@ const ApiKeyListItem = ({ apiKey }: Props) => {
           <Text type="tertiary"> &middot; {t("Restricted scope")}</Text>
         </Tooltip>
       )}
+      {apiKey.hasActiveGracePeriod && (
+        <Text type="tertiary">
+          {" "}
+          &middot; {t("Previous key valid")}{" "}
+          <Time dateTime={apiKey.previousHashExpiresAt!} addSuffix />
+        </Text>
+      )}
     </>
   );
 

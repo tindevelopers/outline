@@ -1,5 +1,7 @@
 import Router from "koa-router";
 import { Op, Sequelize, type WhereOptions } from "sequelize";
+import { ApiKeyValidation } from "@shared/validations";
+import { NotFoundError } from "@server/errors";
 import auth from "@server/middlewares/authentication";
 import { rateLimiter } from "@server/middlewares/rateLimiter";
 import { transaction } from "@server/middlewares/transaction";
@@ -138,6 +140,41 @@ router.post(
 
     ctx.body = {
       success: true,
+    };
+  }
+);
+
+router.post(
+  "apiKeys.regenerate",
+  rateLimiter(RateLimiterStrategy.TwentyFivePerMinute),
+  auth({
+    type: AuthenticationType.APP,
+  }),
+  validate(T.APIKeysRegenerateSchema),
+  transaction(),
+  async (ctx: APIContext<T.APIKeysRegenerateReq>) => {
+    const { id, gracePeriod } = ctx.input.body;
+    const { user } = ctx.state.auth;
+    const { transaction } = ctx.state;
+
+    const key = await ApiKey.scope("withUser").findByPk(id, {
+      lock: {
+        level: transaction.LOCK.UPDATE,
+        of: ApiKey,
+      },
+      transaction,
+    });
+
+    if (!key) {
+      throw NotFoundError();
+    }
+
+    authorize(user, "regenerate", key);
+
+    await key.rotate(ctx, gracePeriod ? ApiKeyValidation.gracePeriodHours : 0);
+
+    ctx.body = {
+      data: presentApiKey(key),
     };
   }
 );

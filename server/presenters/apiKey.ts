@@ -13,6 +13,7 @@ export default function presentApiKey(apiKey: ApiKey) {
     createdAt: apiKey.createdAt,
     updatedAt: apiKey.updatedAt,
     expiresAt: apiKey.expiresAt,
+    previousHashExpiresAt: apiKey.previousHashExpiresAt,
     lastActiveAt: apiKey.lastActiveAt,
   };
 }

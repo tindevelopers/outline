@@ -25,6 +25,7 @@ export class EventHelper {
   public static AUDIT_EVENTS = [
     "api_keys.create",
     "api_keys.delete",
+    "api_keys.regenerate",
     "authenticationProviders.update",
     "collections.create",
     "collections.update",
