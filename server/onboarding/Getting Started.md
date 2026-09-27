@@ -1,8 +1,8 @@
-Some ideas to get you and your team started with learning the basics of TIN Vault, feel free to check them off as you go!
+Some ideas to get you and your team started with learning the basics of TIN KB, feel free to check them off as you go!
 
 ## Learn the basics
 
-- [x] Create a TIN Vault account
+- [x] Create a TIN KB account
 - [ ] **Create a collection** from the left sidebar
 - [ ] **Create a new doc** from the top right of home or any collection
 - [ ] Try drag and drop to nest and move documents
