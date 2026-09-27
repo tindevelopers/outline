@@ -44,6 +44,10 @@ services:
   outline:
     image: ghcr.io/tindevelopers/outline:${OUTLINE_TAG:-latest}
     restart: unless-stopped
+    # The image's entrypoint applies pending database migrations before the
+    # server starts, so a rollback to an older tag needs no migration of its
+    # own. Keep this service at a single replica: two containers starting at
+    # once would race on the migration table, which has no cross-process lock.
     depends_on:
       redis:
         condition: service_healthy
