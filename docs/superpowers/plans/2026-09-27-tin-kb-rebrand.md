@@ -268,12 +268,17 @@ git commit -m "feat: rename onboarding documents and provisioner copy to TIN KB"
 
 - [ ] **Step 4: Run the focused tests**
 
+The `/developers` block in `server/routes/index.test.ts` depends on Task 6's
+portal changes, so it is expected to fail until then. Run only the share-title
+and Slack tests here:
+
 Run:
 ```bash
 export DATABASE_URL="$(grep '^DATABASE_URL=' .env.test | cut -d= -f2-)" NODE_ENV=test TZ=UTC && \
-node_modules/.bin/vitest run server/routes/index.test.ts plugins/slack/server/api/hooks.test.ts
+node_modules/.bin/vitest run server/routes/index.test.ts -t "standard title" && \
+node_modules/.bin/vitest run plugins/slack/server/api/hooks.test.ts
 ```
-Expected: PASS. If these fail, the strings changed in earlier tasks do not match the code — fix the code, not the test.
+Expected: PASS. If these fail, the strings changed in earlier tasks do not match the code — fix the code, not the test. The full file is run again in Task 6 Step 9 and Task 10.
 
 - [ ] **Step 5: Commit**
 
