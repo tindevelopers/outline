@@ -96,7 +96,7 @@ export function AuthCard({ config }: Props) {
   return (
     <Copy>
       <div className="intro">
-        <h1>{t("Sign in to TIN Vault")}</h1>
+        <h1>{t("Sign in to TIN KB")}</h1>
         <p className="sub">
           {t(
             "Use your work account. We'll show you only the workspaces you belong to."

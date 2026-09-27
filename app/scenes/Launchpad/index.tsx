@@ -124,7 +124,7 @@ type Props = {
 };
 
 /**
- * The TIN Vault Launchpad: the apex authentication and workspace launch
+ * The TIN KB Launchpad: the apex authentication and workspace launch
  * experience in the Paper and Ink direction. Renders sign-in, the membership
  * selector, the single-workspace handoff and the terminal states.
  *

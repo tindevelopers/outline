@@ -168,7 +168,7 @@ export const navigateToAccountPreferences = createInternalLinkAction({
 });
 
 export const openDocumentation = createExternalLinkAction({
-  name: ({ t }) => t("TIN Vault Guide"),
+  name: ({ t }) => t("TIN KB Guide"),
   analyticsName: "Open documentation",
   section: NavigationSection,
   iconInContextMenu: false,
