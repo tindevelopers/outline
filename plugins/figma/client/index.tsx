@@ -11,7 +11,7 @@ PluginManager.add([
       group: "Integrations",
       icon: Icon,
       description:
-        "Connect your Figma account to TIN Vault to enable rich design file previews inside documents.",
+        "Connect your Figma account to TIN KB to enable rich design file previews inside documents.",
       component: createLazyComponent(() => import("./Settings")),
     },
   },
