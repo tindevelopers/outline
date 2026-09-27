@@ -61,7 +61,7 @@ In `server/env.ts`, line 886:
 In `app.json`, line 2:
 
 ```json
-  "name": "TIN Knowledge Base",
+  "name": "TIN KB",
 ```
 
 - [ ] **Step 3: Change the build-time manifest injection**

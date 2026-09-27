@@ -35,7 +35,7 @@ portal.
 | Context | Form | Rationale |
 | --- | --- | --- |
 | Browser tab title, PWA `short_name`, plugin descriptions, eyebrow labels, error strings, API spec title | **TIN KB** | Space-constrained. Most of these are driven by the single `env.APP_NAME` value (section 4.1). |
-| PWA `name` field, first mention in flowing prose (onboarding documents, API spec introduction) | **TIN Knowledge Base** | Full name where there is room. |
+| PWA manifest `name` field, first mention in flowing prose (onboarding documents, API spec introduction) | **TIN Knowledge Base** | Full name where there is room. |
 
 The rule resolves per occurrence, not mechanically. Worked example: the
 onboarding opener currently reads "TIN Vault is a place to build your team
@@ -77,8 +77,8 @@ identifiers — the WebAuthn relying-party *ID* is the domain and does not read
 
 | File | Change |
 | --- | --- |
-| `app.json:2` | `name` → `TIN Knowledge Base` |
-| `vite.config.ts:128-129` | `name` → `TIN Knowledge Base`, `short_name` → `TIN KB` |
+| `app.json:2` | Heroku app manifest `name` → `TIN KB`. An app label rather than prose, so the short form applies |
+| `vite.config.ts:128-129` | PWA manifest `name` → `TIN Knowledge Base`, `short_name` → `TIN KB` |
 
 ### 4.3 Launchpad (added after the source runbook)
 

@@ -125,8 +125,8 @@ export default ({ mode }: ConfigEnv) =>
           ],
         },
         manifest: {
-          name: "TIN Vault",
-          short_name: "TIN Vault",
+          name: "TIN Knowledge Base",
+          short_name: "TIN KB",
           theme_color: "#fff",
           background_color: "#fff",
           start_url: "/",
