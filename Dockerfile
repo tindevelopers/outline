@@ -49,6 +49,10 @@ RUN mkdir -p "$FILE_STORAGE_LOCAL_ROOT_DIR" && \
     chown -R nodejs:nodejs "$FILE_STORAGE_LOCAL_ROOT_DIR" && \
     chmod 1777 "$FILE_STORAGE_LOCAL_ROOT_DIR"
 
+# The migrations in ./server and the Sequelize CLI in ./server/node_modules are
+# both needed at runtime, not just at build time.
+RUN chmod +x server/scripts/docker-entrypoint.sh
+
 VOLUME /var/lib/outline/data
 
 USER nodejs
@@ -56,4 +60,7 @@ USER nodejs
 HEALTHCHECK --interval=1m CMD wget -qO- "http://localhost:${PORT:-3000}/_health" | grep -q "OK" || exit 1
 
 EXPOSE 3000
+# Applies pending migrations, then runs the CMD below. Migrations are not run by
+# the image build or by Watchtower. Assumes a single replica.
+ENTRYPOINT ["/opt/outline/server/scripts/docker-entrypoint.sh"]
 CMD ["node", "build/server/index.js"]
