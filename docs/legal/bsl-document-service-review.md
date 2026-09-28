@@ -1,4 +1,4 @@
-# BSL "Document Service" review — TIN Vault white-label
+# BSL "Document Service" review — TIN KB white-label
 
 Factual notes only. No conclusions are drawn here; this is a question for counsel.
 
@@ -35,7 +35,7 @@ controlled by such third parties"?
 ## Scope of this white-label work
 
 This white-label work (rebranding the vendored OpenAPI specification and
-associated developer-docs assets as "TIN Vault", served at
+associated developer-docs assets as "TIN KB", served at
 `docs.tin.info`) changes branding only. It does not change how workspaces
 are created, who controls the teams or documents within them, or any other
 fact relevant to the "Document Service" analysis above.
