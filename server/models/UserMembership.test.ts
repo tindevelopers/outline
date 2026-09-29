@@ -4,6 +4,7 @@ import {
   buildCollection,
   buildDocument,
   buildGroup,
+  buildGuestUser,
   buildUser,
 } from "@server/test/factories";
 import { withAPIContext } from "@server/test/support";
@@ -103,6 +104,36 @@ describe("UserMembership", () => {
       await expect(two).rejects.toThrow(
         "At least one user or group must have manage permissions"
       );
+    });
+  });
+
+  describe("guest cap", () => {
+    it("should reject an admin membership for a guest", async () => {
+      const collection = await buildCollection();
+      const guest = await buildGuestUser({ teamId: collection.teamId });
+
+      await expect(
+        UserMembership.create({
+          createdById: guest.id,
+          userId: guest.id,
+          collectionId: collection.id,
+          permission: CollectionPermission.Admin,
+        })
+      ).rejects.toThrow("Guests cannot be granted manage permissions");
+    });
+
+    it("should allow a read_write membership for a guest", async () => {
+      const collection = await buildCollection();
+      const guest = await buildGuestUser({ teamId: collection.teamId });
+
+      const membership = await UserMembership.create({
+        createdById: guest.id,
+        userId: guest.id,
+        collectionId: collection.id,
+        permission: CollectionPermission.ReadWrite,
+      });
+
+      expect(membership.permission).toEqual(CollectionPermission.ReadWrite);
     });
   });
 });
