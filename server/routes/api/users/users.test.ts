@@ -699,6 +699,22 @@ describe("#users.info", () => {
 });
 
 describe("#users.invite", () => {
+  it("should reject the guest role", async () => {
+    const admin = await buildAdmin();
+    const res = await server.post("/api/users.invite", admin, {
+      body: {
+        invites: [
+          {
+            email: "outsider@example.com",
+            name: "Outsider",
+            role: "guest",
+          },
+        ],
+      },
+    });
+    expect(res.status).toEqual(400);
+  });
+
   it("should return sent invites", async () => {
     const user = await buildAdmin();
     const res = await server.post("/api/users.invite", user, {

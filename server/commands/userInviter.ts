@@ -6,7 +6,7 @@ import Logger from "@server/logging/Logger";
 import { User, Team } from "@server/models";
 import { UserFlag } from "@server/models/User";
 import type { APIContext } from "@server/types";
-import { DomainNotAllowedError } from "@server/errors";
+import { DomainNotAllowedError, ValidationError } from "@server/errors";
 import { can } from "@server/policies";
 
 export type Invite = {
@@ -73,6 +73,15 @@ export default async function userInviter(
 
   // send and record remaining invites
   for (const invite of filteredInvites) {
+    // Guests are scoped to a specific collection or document, not the
+    // workspace. Accepting the role here would silently grant every
+    // non-private collection.
+    if (invite.role === UserRole.Guest) {
+      throw ValidationError(
+        "Guests are invited to a specific collection or document with users.inviteGuest"
+      );
+    }
+
     // Platform admin can only be granted by an existing platform admin. It
     // outranks workspace roles, so such accounts are provisioned as Admin.
     const grantPlatformAdmin = !!invite.platformAdmin && user.isPlatformAdmin;
