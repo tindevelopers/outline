@@ -55,14 +55,15 @@ Inventory at `09a17222c`:
 | Member list | `app/scenes/Settings/components/UserRoleFilter.tsx` | Admin / Member / Viewer only |
 | Audit events | `shared/utils/EventHelper.ts:70`, `server/types.ts:188` | `users.invite` exists; enumerations are asserted exhaustively |
 
-Two facts that shape the design: the permission column is a string, so a new
-level needs no migration; and the Guest role's scoping rules are already
-correct, so no policy needs to be invented for isolation, only for capping.
+One fact shapes the design: the Guest role's scoping rules are already
+correct, so no policy needs to be invented for isolation, only for capping and
+for authorizing outside invites. Access levels themselves do not change — see
+section 4.
 
 ## 4. Roles and access levels
 
 Roles answer who someone is; access levels answer what they can do on one item.
-They stay separate.
+They stay separate, and this work does not add a level.
 
 | Role | Who | Ambient access |
 | --- | --- | --- |
@@ -74,35 +75,33 @@ They stay separate.
 | Access level | Value | Grantable to a guest | Grantable to staff |
 | --- | --- | --- | --- |
 | View only | `read` | yes | yes |
-| Can comment | `comment` (new) | yes | yes |
 | Can edit | `read_write` | yes | yes |
 | Manage | `admin` | **no** | yes |
 
+View only includes commenting for anyone holding an account, staff and guest
+alike: an outside reader who has been given access may ask a question on the
+page they were given. This is the current behaviour for staff, and it is what
+guests will get. Commenting is therefore not a per-invitation capability.
+
+What stops comments is the content, and those two existing switches are enough:
+
+- the workspace commenting setting (`TeamPreference.Commenting`), and
+- per-collection commenting (`Collection.commenting`), so client-facing
+  material can live in a collection where nobody comments.
+
+A per-person "read without commenting" state therefore does not exist, and is
+deliberately not being built. A read-only reviewer is served by a collection
+with commenting switched off, or by a public share link, which is anonymous and
+view-only.
+
 ## 5. Data model
 
-`CollectionPermission` and `DocumentPermission` in `shared/types.ts` each gain
-`Comment = "comment"`. The ordering is `read` < `comment` < `read_write` <
-`admin`, but no code depends on enum ordering; the meaning is expressed through
-the explicit permission arrays already used in the policies.
+No schema or model change. `CollectionPermission` and `DocumentPermission`
+keep their three values, the storage columns are unchanged, and no migration is
+required for this work.
 
-Changes:
-
-1. Add the value to both enums in `shared/types.ts`.
-2. Add it to the `@IsIn([Object.values(CollectionPermission)])` validators on
-   `UserMembership` (`server/models/UserMembership.ts`) and
-   `GroupMembership` (`server/models/GroupMembership.ts`), so a `comment`
-   membership can be written.
-3. No migration. The column is a plain string and the value is new, so existing
-   rows are unaffected and the `down` path is a code revert.
-4. `Collection.commenting` and the workspace `TeamPreference.Commenting` keep
-   their current meaning and are not replaced by the new level.
-
-One intentional consequence: because the collection `permission` column validates
-against `CollectionPermission`, "Can comment" also becomes selectable as the
-*collection-wide* default for all members in `InputSelectPermission`. That is
-coherent (all members may comment on everything in the collection) and is
-covered by a test. If it is unwanted, the option list is filtered in the
-component rather than the enum.
+The Guest role value already exists in `UserRole` and is already accepted by the
+`users.role` column, so creating a guest account needs no migration either.
 
 ## 6. Policy changes
 
@@ -110,10 +109,10 @@ Server-side rules, all in `server/policies/`:
 
 | Ability | Change |
 | --- | --- |
-| `read` Collection / Document | Accept `Comment` in the membership arrays, alongside `Read`, `ReadWrite`, `Admin` |
-| `readDocument` Collection | Same, so a comment grant on a collection lets its pages be read |
-| `comment` Document | Accept `Comment` in the membership arrays. The workspace gate stays: a guest may still only comment when the workspace setting is `Everyone`. `collection.commenting === false` still blocks it |
-| `updateDocument` / `createDocument` / `deleteDocument` | Unchanged: `ReadWrite` or `Admin` only, so a comment-only member cannot write |
+| `read` Collection / Document | Unchanged |
+| `readDocument` Collection | Unchanged |
+| `comment` Document | Unchanged. Guests may comment when the workspace setting is `Everyone`, and `collection.commenting === false` still blocks it |
+| `updateDocument` / `createDocument` / `deleteDocument` | Unchanged: `ReadWrite` or `Admin` only |
 | `share` Collection / Document | Unchanged |
 | `inviteGuest` Collection / Document | **New.** Allow when the actor is not a guest, the team is mutable, the item is active, and the actor is either an Admin or holds `Admin` (Manage) on that item |
 | `update`, `archive`, `delete`, `export`, `restore` | Unchanged |
@@ -123,12 +122,8 @@ creation and update reject `permission: admin` when the target user `isGuest`.
 The guest cap on inviting follows from `inviteGuest` itself, which rejects guest
 actors.
 
-The permission arrays currently repeated across the policies move to module
-constants in `server/policies/collection.ts` and `document.ts`, so the new level
-cannot be added to one call site and missed at another. Every existing
-`permission !== CollectionPermission.ReadWrite` comparison
-(`collection.ts:104,122,150`, `routes/api/collections/collections.ts:635`) is
-audited as part of this change, since those checks assume a three-value set.
+No existing permission array or comparison changes, because no level is added.
+Both new abilities are additive.
 
 ## 7. Server: guest invite
 
@@ -145,7 +140,7 @@ Request body:
   name?: string,
   collectionId?: uuid,
   documentId?: uuid,
-  permission: "read" | "comment" | "read_write"
+  permission: "read" | "read_write"
 }
 ```
 
@@ -207,18 +202,17 @@ rather than "join the workspace" — reusing the existing token link.
 Share dialog (both `app/components/Sharing/Collection/SharePopover.tsx` and
 `app/components/Sharing/Document/SharePopover.tsx`): when the search text is an
 email address that matches no existing user, the picker offers "Invite as guest"
-with a permission select defaulting to **Can comment**. Confirming calls the new
-store method once, replacing the current two-call sequence
-(`users.invite` followed by `memberships.create`) for the outside-email case.
+with a permission select offering **View only** and **Can edit**, defaulting to
+View only. Confirming calls the new store method once, replacing the current
+two-call sequence (`users.invite` followed by `memberships.create`) for the
+outside-email case.
 
 - `app/stores/UsersStore.ts` gains `inviteGuest`, posting to
   `/api/users.inviteGuest`.
-- `app/components/InputMemberPermissionSelect.tsx` call sites gain the "Can
-  comment" option. The permission option lists are currently duplicated across
-  five components — `InputSelectPermission.tsx`, both `SharePopover.tsx` files,
-  both `AccessControlList.tsx` files, `DocumentMemberList.tsx`, and
-  `DocumentMemberListItem.tsx` — and are consolidated into one shared list so
-  the new level cannot be missed in one of them.
+- The permission select in the share dialog hides **Manage** while an email
+  address is pending, because a guest can never hold it. This is a local filter
+  in the two share dialogs; the staff pickers elsewhere keep all three levels
+  unchanged, and no other component is touched.
 - Settings → Members: `app/scenes/Settings/components/UserRoleFilter.tsx` gains
   a Guest entry so guests are reviewable and revocable in one place.
   `UserRoleHelper.displayName` already handles the label.
@@ -233,16 +227,19 @@ store method once, replacing the current two-call sequence
 
 - The sidebar shows only the collections and pages the guest holds a membership
   on; the existing "Shared with me" section already renders memberships.
-- The comment box appears only when all three gates pass: the workspace
-  commenting setting allows guests, the item grants `comment` or higher, and the
-  collection's `commenting` switch is not disabled.
+- Commenting works the same way it does for staff: a guest who can read an item
+  can comment on it, subject to the workspace commenting setting and the
+  collection's own commenting switch. Both switches are unchanged, and a
+  collection with commenting disabled is how a read-only, no-comments
+  collection is expressed.
 - Comments carry the guest's name and initial like any other author, through the
   existing avatar and presenter path.
 - Guests can subscribe to items they can read and receive comment
   notifications; `subscribe` already requires only `read` on the item.
 - Guests cannot reach settings, templates, invites, API keys, integrations, the
   user directory, or mention suggestions. All of this is existing policy; the
-  only new rule is the cap on `admin` memberships.
+  only new rules are the cap on `admin` memberships and the guest exclusion on
+  `inviteGuest`.
 - Download and export stay off for guests unless the workspace enables
   `ViewersCanExport`.
 - Search returns only what the guest can read, through the existing membership
@@ -265,13 +262,12 @@ Then:
 
 New tests:
 
-- policy: a guest with `comment` can read and comment and cannot write; a guest
-  with `read_write` cannot manage; a non-private collection still grants nothing
-  to a guest without a membership; `inviteGuest` allowed for an admin and for a
-  Manage holder, refused for an editor without Manage, a viewer, and a guest
-- membership: a `comment` grant on a collection propagates to its child
-  documents through the existing sourced-membership path; `permission: admin`
-  is rejected for a guest target
+- policy: a guest with `read_write` can read and write but cannot manage; a
+  non-private collection still grants nothing to a guest without a membership;
+  `inviteGuest` allowed for an admin and for a Manage holder, refused for an
+  editor without Manage, a viewer, and a guest even when that guest holds Manage
+- membership: `permission: admin` is rejected for a guest target on both a user
+  membership and a group membership covering a guest
 - command: new email creates a Guest with a membership and schedules one email;
   outside domain succeeds where a staff invite would fail; an existing staff
   user is reused without a role change; an existing guest is reused; a repeat
@@ -281,8 +277,8 @@ New tests:
 - route: `users.invite` rejects `role: Guest` instead of silently producing a
   Member
 - manual: sign in as a real guest and confirm the sidebar contains only granted
-  items, the comment box appears and works when the workspace setting allows it,
-  and no settings, invite, or member surfaces are reachable
+  items, commenting works when the workspace setting allows it and stops when it
+  does not, and no settings, invite, or member surfaces are reachable
 
 ## 11. Risks
 
@@ -290,7 +286,6 @@ New tests:
 | --- | --- |
 | Guest code paths are dormant and largely untested | Treat the manual guest session as a required verification step, not optional. Realtime editing for guests is the highest-risk area: guests are deliberately excluded from the team websocket channel (`server/services/websockets.ts:199`, `queues/processors/WebsocketsProcessor.ts:978`), so document-level collaboration must be confirmed separately |
 | SSO sign-in may turn away an outside email that the workspace domain rules do not allow | Confirm the auth path matches the already-invited account before the invite is sent, and test the flow end to end with an outside domain |
-| Adding a fourth permission value silently changes behaviour at `!== ReadWrite` comparisons | Audit every comparison listed in section 6 and move the permission arrays to shared constants |
 | An admin creates a guest, then promotes them to Editor unintentionally keeping broad grants | Promotion is the existing explicit role change; a guest's grants are memberships, so they stay as they were and remain visible in Settings → Members |
 | Emails to outside domains land in spam, so guests never arrive | The invite email is the only delivery path today; deliverability is worth a spot check on a real outside address during verification |
 
@@ -313,17 +308,20 @@ behave under existing policy.
   `document_insights`, since the existing `views` table records that someone was
   on a page but not for how long, and events are not grouped into sessions.
 - Guests managing a collection, inviting others, or seeing the member directory.
+- A per-person read-without-commenting level. Read-only, no-comments access is
+  expressed by a collection with commenting switched off, or by a public share
+  link.
 - Per-guest content redaction, watermarking, or IP-restricted access.
 - Seat or billing accounting for guests.
 - Bulk guest invites or CSV import of outside addresses.
 
 ## 14. Phasing
 
-1. **Can comment level and guest invites.** Interdependent, since the default
-   guest permission is Can comment. Enum and validators, policy changes, shared
-   permission constants, sourced membership propagation, the invite command and
-   route, the share dialog with a guest permission picker, the guest invite
-   email, and the audit event. This delivers the request end to end.
+1. **Guest invites.** The `inviteGuest` policy abilities and their tests are
+   already in place. What remains: the guest cap on memberships, refusing the
+   guest role on `users.invite`, the invite command and route, the click-through
+   guest invite email, the share dialog gaining a guest path, and the audit
+   event. This delivers the request end to end.
 2. **Review and lifecycle polish.** Guest entry in the role filter, the "remove
    this guest from the workspace" prompt when the last grant is dropped, and a
    check that comment notifications reach an outside inbox.
