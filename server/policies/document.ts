@@ -271,6 +271,22 @@ allow(User, "unpublish", Document, (user, document) => {
   return user.teamId === document.teamId;
 });
 
+// A document can be shared with an outside collaborator by an admin or by
+// anyone holding admin (manage) on the document itself. Guests may never
+// invite, so a guest with manage cannot grow its own access.
+allow(User, "inviteGuest", Document, (actor, document) =>
+  and(
+    !!document?.isActive,
+    !actor.isGuest,
+    isTeamModel(actor, document),
+    isTeamMutable(actor),
+    or(
+      isTeamAdmin(actor, document),
+      includesMembership(document, [DocumentPermission.Admin])
+    )
+  )
+);
+
 function includesMembership(
   document: Document | null,
   permissions: DocumentPermission[]

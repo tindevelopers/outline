@@ -13,8 +13,92 @@ import {
   buildDraftDocument,
   buildCollection,
   buildAdmin,
+  buildGuestUser,
 } from "@server/test/factories";
 import { serialize } from "./index";
+
+describe("inviteGuest", () => {
+  it("should allow an admin", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const collection = await buildCollection({ teamId: team.id });
+    const doc = await buildDocument({
+      teamId: team.id,
+      collectionId: collection.id,
+    });
+    const document = await Document.findByPk(doc.id, { userId: admin.id });
+    const abilities = serialize(admin, document);
+    expect(abilities.inviteGuest).toBeTruthy();
+  });
+
+  it("should allow a member holding manage on the document", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const user = await buildUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      permission: null,
+    });
+    const doc = await buildDocument({
+      teamId: team.id,
+      collectionId: collection.id,
+    });
+    await UserMembership.create({
+      createdById: admin.id,
+      documentId: doc.id,
+      userId: user.id,
+      permission: DocumentPermission.Admin,
+    });
+    const document = await Document.findByPk(doc.id, { userId: user.id });
+    const abilities = serialize(user, document);
+    expect(abilities.inviteGuest).toBeTruthy();
+  });
+
+  it("should not allow a member holding only edit", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const user = await buildUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      permission: null,
+    });
+    const doc = await buildDocument({
+      teamId: team.id,
+      collectionId: collection.id,
+    });
+    await UserMembership.create({
+      createdById: admin.id,
+      documentId: doc.id,
+      userId: user.id,
+      permission: DocumentPermission.ReadWrite,
+    });
+    const document = await Document.findByPk(doc.id, { userId: user.id });
+    const abilities = serialize(user, document);
+    expect(abilities.inviteGuest).toEqual(false);
+  });
+
+  it("should not allow a guest, even with manage on the document", async () => {
+    const team = await buildTeam();
+    const guest = await buildGuestUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      permission: null,
+    });
+    const doc = await buildDocument({
+      teamId: team.id,
+      collectionId: collection.id,
+    });
+    await UserMembership.create({
+      createdById: guest.id,
+      documentId: doc.id,
+      userId: guest.id,
+      permission: DocumentPermission.Admin,
+    });
+    const document = await Document.findByPk(doc.id, { userId: guest.id });
+    const abilities = serialize(guest, document);
+    expect(abilities.inviteGuest).toEqual(false);
+  });
+});
 
 describe("read_write collection", () => {
   it("should allow read write permissions for member", async () => {

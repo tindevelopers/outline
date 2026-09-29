@@ -237,6 +237,24 @@ allow(User, "restore", Collection, (user, collection) =>
   )
 );
 
+// Sharing a collection with someone outside the workspace is authorized by the
+// collection, not by a workspace-wide invite switch, so a member who has admin
+// (manage) on this collection may add an outside collaborator. Guests may never
+// invite anyone, otherwise a guest holding manage could grow its own access.
+allow(User, "inviteGuest", Collection, (actor, collection) =>
+  and(
+    !!collection,
+    !!collection?.isActive,
+    !actor.isGuest,
+    isTeamModel(actor, collection),
+    isTeamMutable(actor),
+    or(
+      isTeamAdmin(actor, collection),
+      includesMembership(collection, [CollectionPermission.Admin])
+    )
+  )
+);
+
 function includesMembership(
   collection: Collection | null,
   permissions: CollectionPermission[]
