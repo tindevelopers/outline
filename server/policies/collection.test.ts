@@ -84,12 +84,18 @@ describe("inviteGuest", () => {
       teamId: team.id,
       permission: null,
     });
-    await UserMembership.create({
-      createdById: guest.id,
-      collectionId: collection.id,
-      userId: guest.id,
-      permission: CollectionPermission.Admin,
-    });
+    await UserMembership.create(
+      {
+        createdById: guest.id,
+        collectionId: collection.id,
+        userId: guest.id,
+        permission: CollectionPermission.Admin,
+      },
+      // The guest cap rejects this combination through the model hook; bypass
+      // it to construct the strongest possible guest actor and prove that the
+      // policy still refuses them.
+      { hooks: false }
+    );
     const reloaded = await Collection.findByPk(collection.id, {
       userId: guest.id,
     });

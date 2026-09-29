@@ -122,6 +122,12 @@ creation and update reject `permission: admin` when the target user `isGuest`.
 The guest cap on inviting follows from `inviteGuest` itself, which rejects guest
 actors.
 
+One consequence to be aware of: a guest can no longer be a collection or
+document manager at all. That state was previously reachable through the model,
+and a policy test iterated over every role asserting manage abilities for each.
+Guests are now excluded from that iteration, with a companion test asserting the
+refusal instead. If a guest manager is ever needed, this is the rule to revisit.
+
 No existing permission array or comparison changes, because no level is added.
 Both new abilities are additive.
 

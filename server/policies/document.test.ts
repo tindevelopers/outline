@@ -88,12 +88,18 @@ describe("inviteGuest", () => {
       teamId: team.id,
       collectionId: collection.id,
     });
-    await UserMembership.create({
-      createdById: guest.id,
-      documentId: doc.id,
-      userId: guest.id,
-      permission: DocumentPermission.Admin,
-    });
+    await UserMembership.create(
+      {
+        createdById: guest.id,
+        documentId: doc.id,
+        userId: guest.id,
+        permission: DocumentPermission.Admin,
+      },
+      // The guest cap rejects this combination through the model hook; bypass
+      // it to construct the strongest possible guest actor and prove that the
+      // policy still refuses them.
+      { hooks: false }
+    );
     const document = await Document.findByPk(doc.id, { userId: guest.id });
     const abilities = serialize(guest, document);
     expect(abilities.inviteGuest).toEqual(false);
@@ -737,7 +743,13 @@ describe("commenting access", () => {
 });
 
 describe("manage document", () => {
-  for (const role of Object.values(UserRole)) {
+  // Guests can never hold manage, enforced by the membership model. The
+  // refusal is asserted below rather than iterated here.
+  const manageableRoles = Object.values(UserRole).filter(
+    (role) => role !== UserRole.Guest
+  );
+
+  for (const role of manageableRoles) {
     it(`should allow write permissions, user management, and sub-document creation for ${role}`, async () => {
       const team = await buildTeam();
       team.setPreference(TeamPreference.Commenting, CommentingAccess.Everyone);
@@ -778,4 +790,26 @@ describe("manage document", () => {
       expect(abilities.share).toEqual(false);
     });
   }
+
+  it("should not allow a guest to be granted manage on a document", async () => {
+    const team = await buildTeam();
+    const guest = await buildGuestUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      permission: null,
+    });
+    const doc = await buildDocument({
+      teamId: team.id,
+      collectionId: collection.id,
+    });
+
+    await expect(
+      UserMembership.create({
+        userId: guest.id,
+        documentId: doc.id,
+        permission: DocumentPermission.Admin,
+        createdById: guest.id,
+      })
+    ).rejects.toThrow("Guests cannot be granted manage permissions");
+  });
 });

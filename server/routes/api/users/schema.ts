@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  CollectionPermission,
   NotificationBadgeType,
   NotificationEventType,
   SidebarSection,
@@ -236,3 +237,19 @@ export const UsersInviteSchema = z.object({
 });
 
 export type UsersInviteReq = z.infer<typeof UsersInviteSchema>;
+
+export const UsersInviteGuestSchema = z.object({
+  body: z.object({
+    email: z.email().transform((email) => email.toLowerCase()),
+    name: z.string().optional(),
+    collectionId: z.uuid().optional(),
+    documentId: z.uuid().optional(),
+    /** Guests may be granted view only or edit, never manage. */
+    permission: z.enum([
+      CollectionPermission.Read,
+      CollectionPermission.ReadWrite,
+    ]),
+  }),
+});
+
+export type UsersInviteGuestReq = z.infer<typeof UsersInviteGuestSchema>;
