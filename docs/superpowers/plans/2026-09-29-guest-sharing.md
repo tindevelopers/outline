@@ -60,7 +60,7 @@ Dependencies are already installed in this worktree; invoke tools directly (`./n
 - Modify: `server/models/GroupMembership.ts`
 - Test: `server/models/UserMembership.test.ts`, `server/models/GroupMembership.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `server/models/UserMembership.test.ts`, inside the top-level `describe("UserMembership", ...)`:
 
@@ -131,7 +131,7 @@ Add to `server/models/GroupMembership.test.ts`:
 
 Import `GroupUser`, `buildAdmin`, `buildGuestUser`, and `GroupMembership` in that file as needed. Check the existing import block before editing so you extend it rather than replace it.
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 ```bash
 ./node_modules/.bin/vitest run server/models/UserMembership.test.ts server/models/GroupMembership.test.ts
@@ -139,7 +139,7 @@ Import `GroupUser`, `buildAdmin`, `buildGuestUser`, and `GroupMembership` in tha
 
 Expected: FAIL. Both writes currently succeed, which is the hole this task closes.
 
-- [ ] **Step 3: Add the user-side hook**
+- [x] **Step 3: Add the user-side hook**
 
 In `server/models/UserMembership.ts`, alongside the existing `checkLastAdminBeforeUpdate` hook:
 
@@ -168,7 +168,7 @@ In `server/models/UserMembership.ts`, alongside the existing `checkLastAdminBefo
 
 `ValidationError` is already imported; add `BeforeCreate` to the `sequelize-typescript` import list.
 
-- [ ] **Step 4: Add the group-side hook**
+- [x] **Step 4: Add the group-side hook**
 
 In `server/models/GroupMembership.ts`:
 
@@ -205,7 +205,7 @@ In `server/models/GroupMembership.ts`:
 
 Add `BeforeCreate`, `SaveOptions`, `GroupUser`, `User`, `UserRole`, and `ValidationError` to that file's imports as needed. If the file already imports `UserRole` from `@shared/types`, reuse it.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 ./node_modules/.bin/vitest run server/models/UserMembership.test.ts server/models/GroupMembership.test.ts server/models/User.test.ts
@@ -213,7 +213,7 @@ Add `BeforeCreate`, `SaveOptions`, `GroupUser`, `User`, `UserRole`, and `Validat
 
 Expected: PASS, including `User.test.ts`, which changes roles to and from `guest` and exercises membership cascades.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/models/UserMembership.ts server/models/GroupMembership.ts server/models/UserMembership.test.ts server/models/GroupMembership.test.ts
@@ -229,7 +229,7 @@ git commit -m "feat: prevent guests from being granted manage permissions"
 - Modify: `server/commands/userInviter.ts`
 - Test: `server/routes/api/users/users.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `describe("#users.invite", ...)` in `server/routes/api/users/users.test.ts`:
 
@@ -251,7 +251,7 @@ Add to `describe("#users.invite", ...)` in `server/routes/api/users/users.test.t
   });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 ./node_modules/.bin/vitest run server/routes/api/users/users.test.ts -t "should reject the guest role"
@@ -259,7 +259,7 @@ Add to `describe("#users.invite", ...)` in `server/routes/api/users/users.test.t
 
 Expected: FAIL with status 200, because the schema accepts `guest` and `userInviter` silently coerces it to Member.
 
-- [ ] **Step 3: Reject the role in the schema**
+- [x] **Step 3: Reject the role in the schema**
 
 In `server/routes/api/users/schema.ts`, in `UsersInviteSchema`:
 
@@ -272,7 +272,7 @@ In `server/routes/api/users/schema.ts`, in `UsersInviteSchema`:
           }),
 ```
 
-- [ ] **Step 4: Add the defensive check in the command**
+- [x] **Step 4: Add the defensive check in the command**
 
 In `server/commands/userInviter.ts`, at the top of the `for (const invite of filteredInvites)` loop:
 
@@ -286,7 +286,7 @@ In `server/commands/userInviter.ts`, at the top of the `for (const invite of fil
 
 Add `ValidationError` to the `@server/errors` import, which currently imports only `DomainNotAllowedError`.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 ./node_modules/.bin/vitest run server/routes/api/users/users.test.ts server/commands/userInviter.test.ts
@@ -294,7 +294,7 @@ Add `ValidationError` to the `@server/errors` import, which currently imports on
 
 Expected: PASS, including the existing invite tests that use `member`, `viewer`, and `admin`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/routes/api/users/schema.ts server/commands/userInviter.ts server/routes/api/users/users.test.ts
@@ -308,11 +308,11 @@ git commit -m "fix: refuse the guest role on users.invite instead of silently cr
 **Files:**
 - Create: `server/emails/templates/GuestInviteEmail.tsx`
 
-- [ ] **Step 1: Read the sibling template first**
+- [x] **Step 1: Read the sibling template first**
 
 Read `server/emails/templates/InviteEmail.tsx`. It is the canonical shape for an invitation email and its component imports are what the snippet below assumes. If any component name differs there, follow that file rather than the snippet.
 
-- [ ] **Step 2: Create the template**
+- [x] **Step 2: Create the template**
 
 ```tsx
 import * as React from "react";
@@ -441,7 +441,7 @@ ${this.t("Open now")}: ${link}
 
 Note the smart quotes in the copy: the source guidelines require them, so keep the curly quotes as written. Check how `InviteEmail` passes `previewText` (property style versus call) and match it.
 
-- [ ] **Step 3: Verify it compiles**
+- [x] **Step 3: Verify it compiles**
 
 ```bash
 ./node_modules/.bin/tsc --noEmit
@@ -449,7 +449,7 @@ Note the smart quotes in the copy: the source guidelines require them, so keep t
 
 Expected: exit 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/emails/templates/GuestInviteEmail.tsx
@@ -464,12 +464,12 @@ git commit -m "feat: add a guest invite email that names the shared item"
 - Create: `server/commands/guestInviter.ts`
 - Test: `server/commands/guestInviter.test.ts`
 
-- [ ] **Step 1: Read two things before writing the test**
+- [x] **Step 1: Read two things before writing the test**
 
 - `server/test/support.ts` — `withAPIContext(user, fn)` takes the actor and a callback, and provides `ctx.state.auth.user` and `ctx.state.transaction`. The tests below depend on that.
 - `server/test/factories.ts` — confirm the names `buildAdmin`, `buildGuestUser`, `buildCollection`, `buildDocument`, `buildTeam`, `buildUser` and the `buildCollection`/`buildDocument` option shape (`teamId`, `collectionId`, `createdById`, `permission`).
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `server/commands/guestInviter.test.ts`:
 
@@ -718,7 +718,7 @@ describe("guestInviter", () => {
 });
 ```
 
-- [ ] **Step 3: Run the tests and watch them fail**
+- [x] **Step 3: Run the tests and watch them fail**
 
 ```bash
 ./node_modules/.bin/vitest run server/commands/guestInviter.test.ts
@@ -726,7 +726,7 @@ describe("guestInviter", () => {
 
 Expected: FAIL with a module-not-found error for `./guestInviter`.
 
-- [ ] **Step 4: Write the command**
+- [x] **Step 4: Write the command**
 
 Create `server/commands/guestInviter.ts`:
 
@@ -875,7 +875,7 @@ Notes for the implementer:
 - The domain allowlist is deliberately not consulted here. Do not copy that block from `userInviter`.
 - The email template and this command must agree on the prop names. If `GuestInviteEmail` ends up with different names, adjust this call to match the template, not the other way around.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 ./node_modules/.bin/vitest run server/commands/guestInviter.test.ts
@@ -883,7 +883,7 @@ Notes for the implementer:
 
 Expected: PASS on all eight cases.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/commands/guestInviter.ts server/commands/guestInviter.test.ts
@@ -900,7 +900,7 @@ git commit -m "feat: invite outside collaborators to a single collection or docu
 - Modify: `shared/utils/EventHelper.ts`, `server/types.ts`, `plugins/webhooks/server/tasks/DeliverWebhookTask.ts`
 - Test: `server/routes/api/users/users.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `server/routes/api/users/users.test.ts`:
 
@@ -1019,7 +1019,7 @@ Two notes on these tests:
 - The guest-cap hook from Task 1 would reject the `Admin` membership written directly in the last test. Write that membership with the hook bypassed, or construct the guest's manage access through a route instead. The simplest path is `UserMembership.create({...}, { hooks: false })`, which the model already supports elsewhere.
 - `server.post(path, user, options)` is the existing test helper shape; the request body is nested under `body`.
 
-- [ ] **Step 2: Run the tests and watch them fail**
+- [x] **Step 2: Run the tests and watch them fail**
 
 ```bash
 ./node_modules/.bin/vitest run server/routes/api/users/users.test.ts -t "users.inviteGuest"
@@ -1027,7 +1027,7 @@ Two notes on these tests:
 
 Expected: FAIL — the route does not exist, so the authenticated cases return an error status.
 
-- [ ] **Step 3: Add the request schema**
+- [x] **Step 3: Add the request schema**
 
 In `server/routes/api/users/schema.ts`:
 
@@ -1050,7 +1050,7 @@ export type UsersInviteGuestReq = z.infer<typeof UsersInviteGuestSchema>;
 
 Add `CollectionPermission` to the `@shared/types` import in that file.
 
-- [ ] **Step 4: Add the route**
+- [x] **Step 4: Add the route**
 
 In `server/routes/api/users/users.ts`, after the `users.invite` route:
 
@@ -1083,7 +1083,7 @@ router.post(
 
 Add imports: `guestInviter` from `@server/commands/guestInviter`, and `presentMembership` from `@server/presenters` if it is not already imported.
 
-- [ ] **Step 5: Register the audit event**
+- [x] **Step 5: Register the audit event**
 
 Add `"users.invite_guest"` to the `users` event name union in `server/types.ts`, mirroring the existing `users.invite` member:
 
@@ -1107,7 +1107,7 @@ Then:
 
 If `tsc` objects to the declared `data` shape because the changeset carries more fields than `email` and `name`, widen that member's `data` to `Record<string, unknown>` rather than casting at the call site, and note the reason in the commit message.
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 ```bash
 ./node_modules/.bin/tsc --noEmit
@@ -1116,7 +1116,7 @@ If `tsc` objects to the declared `data` shape because the changeset carries more
 
 Expected: both pass, including the six new cases.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/routes/api/users/schema.ts server/routes/api/users/users.ts server/routes/api/users/users.test.ts shared/utils/EventHelper.ts server/types.ts plugins/webhooks/server/tasks/DeliverWebhookTask.ts
@@ -1132,7 +1132,7 @@ git commit -m "feat: add users.inviteGuest for sharing items with outside collab
 - Modify: `app/components/Sharing/components/Suggestions.tsx`
 - Modify: `app/components/Sharing/Collection/SharePopover.tsx`, `app/components/Sharing/Document/SharePopover.tsx`
 
-- [ ] **Step 1: Add the store action**
+- [x] **Step 1: Add the store action**
 
 In `app/stores/UsersStore.ts`, after `invite`:
 
@@ -1171,7 +1171,7 @@ In `app/stores/UsersStore.ts`, after `invite`:
 
 Import `CollectionPermission` and `DocumentPermission` from `@shared/types`. Confirm the root store property names — `memberships` and `userMemberships` both exist on `RootStore`.
 
-- [ ] **Step 2: Fix the suggestion label**
+- [x] **Step 2: Fix the suggestion label**
 
 In `app/components/Sharing/components/Suggestions.tsx`, `getSuggestionForEmail` labels the row `email: t("Invite to workspace")`, which is now wrong for this dialog: an email typed here becomes a guest, not a workspace member.
 
@@ -1189,7 +1189,7 @@ In `app/components/Sharing/components/Suggestions.tsx`, `getSuggestionForEmail` 
     );
 ```
 
-- [ ] **Step 3: Route emails through the guest invite in the collection dialog**
+- [x] **Step 3: Route emails through the guest invite in the collection dialog**
 
 In `app/components/Sharing/Collection/SharePopover.tsx`, replace the `inviteAction.perform` body so emails call `users.inviteGuest` and everything else keeps its current path:
 
@@ -1259,11 +1259,11 @@ and filter the permission list so a guest cannot be offered Manage:
 
 `basePermissions` is the existing array this file already builds; leave it as it is and rename only if the surrounding names differ.
 
-- [ ] **Step 4: Repeat for documents**
+- [x] **Step 4: Repeat for documents**
 
 In `app/components/Sharing/Document/SharePopover.tsx`, make the same change, passing `documentId: document.id` to `users.inviteGuest` and using `userMemberships.create` for the non-email branch, which is what that file already calls.
 
-- [ ] **Step 5: Verify by hand**
+- [x] **Step 5: Verify by hand**
 
 Start the app, open a collection, and:
 
@@ -1272,7 +1272,7 @@ Start the app, open a collection, and:
 - add the email, and confirm the row appears in the access list with the chosen level
 - add an existing staff member in the same session and confirm Manage comes back and that person is added as before
 
-- [ ] **Step 6: Type-check and lint**
+- [x] **Step 6: Type-check and lint**
 
 ```bash
 ./node_modules/.bin/tsc --noEmit
@@ -1281,7 +1281,7 @@ Start the app, open a collection, and:
 
 Expected: tsc exits 0 and oxlint reports 0 errors. The warnings are pre-existing.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/stores/UsersStore.ts app/components/Sharing
@@ -1294,7 +1294,7 @@ git commit -m "feat: invite outside emails as guests from the share dialog"
 
 **Files:** none created; this task is evidence gathering.
 
-- [ ] **Step 1: Full type, lint, and format check**
+- [x] **Step 1: Full type, lint, and format check**
 
 ```bash
 ./node_modules/.bin/tsc --noEmit
@@ -1302,14 +1302,14 @@ git commit -m "feat: invite outside emails as guests from the share dialog"
 ./node_modules/.bin/oxfmt --check app server shared plugins
 ```
 
-- [ ] **Step 2: Targeted server suites**
+- [x] **Step 2: Targeted server suites**
 
 ```bash
 export DATABASE_URL="$(grep '^DATABASE_URL=' .env.test | cut -d= -f2-)" NODE_ENV=test TZ=UTC
 ./node_modules/.bin/vitest run server/commands/guestInviter.test.ts server/commands/userInviter.test.ts server/models/UserMembership.test.ts server/models/GroupMembership.test.ts server/policies/collection.test.ts server/policies/document.test.ts server/routes/api/users/users.test.ts server/routes/api/documents/documents.test.ts server/routes/api/collections/collections.test.ts
 ```
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 ```bash
 ./node_modules/.bin/vite build
@@ -1329,7 +1329,7 @@ Expected: success. If the full `yarn build` is unavailable because of the yarn 1
 8. Open a page in the shared collection in two browser sessions (guest and admin) and type simultaneously to confirm realtime editing works for the guest. Guest access to document-level websocket rooms is the most likely failure point; if realtime is broken for guests, stop and report it rather than working around it.
 9. Sign the guest out, then sign in again through the workspace SSO provider rather than the emailed link. The invited email is an outside domain, so this is where workspace domain rules could refuse a legitimate collaborator. Record the exact error before changing anything.
 
-- [ ] **Step 5: Report the evidence**
+- [x] **Step 5: Report the evidence**
 
 Report the commands run and their outcomes. Commit nothing unless a fix was required.
 
@@ -1341,7 +1341,7 @@ Report the commands run and their outcomes. Commit nothing unless a fix was requ
 - Modify: `app/scenes/Settings/components/UserRoleFilter.tsx`
 - Modify: `app/scenes/Settings/Users.tsx` if its counts or empty states enumerate roles
 
-- [ ] **Step 1: Add the filter entry**
+- [x] **Step 1: Add the filter entry**
 
 ```tsx
         {
@@ -1354,11 +1354,11 @@ Report the commands run and their outcomes. Commit nothing unless a fix was requ
         },
 ```
 
-- [ ] **Step 2: Verify by hand**
+- [x] **Step 2: Verify by hand**
 
 Open Settings → Members, filter by Guests, and confirm the invited guest appears with the Guest label and can be revoked, suspended, or promoted from that view.
 
-- [ ] **Step 3: Type-check and commit**
+- [x] **Step 3: Type-check and commit**
 
 ```bash
 ./node_modules/.bin/tsc --noEmit
@@ -1374,7 +1374,7 @@ git commit -m "feat: show guests in the workspace member filters"
 - Create: `app/scenes/Settings/components/RemoveGuestDialog.tsx`
 - Modify: `app/components/Sharing/Collection/AccessControlList.tsx`, `app/components/Sharing/Document/AccessControlList.tsx`
 
-- [ ] **Step 1: Create the dialog**
+- [x] **Step 1: Create the dialog**
 
 Read `app/scenes/Settings/components/ApiKeyRevokeDialog.tsx` first; it is the canonical small confirmation dialog in this codebase and the shape below follows it.
 
@@ -1420,7 +1420,7 @@ export default function RemoveGuestDialog({ user, onSubmit }: Props) {
 
 Confirm `users.actionOnUser` accepts `"delete"` and that `User` exposes `isGuest` on the client model; both exist, but check before relying on them.
 
-- [ ] **Step 2: Trigger it from the collection access list**
+- [x] **Step 2: Trigger it from the collection access list**
 
 In `app/components/Sharing/Collection/AccessControlList.tsx`, add `import type User from "~/models/User";`, destructure `dialogs` and `userMemberships` from `useStores()` alongside the existing stores, then add:
 
@@ -1452,7 +1452,7 @@ In `app/components/Sharing/Collection/AccessControlList.tsx`, add `import type U
 
 Call `offerGuestRemoval(membership.user)` immediately after the `memberships.delete({ collectionId, userId })` call in the membership removal handler. The store removes the membership locally before the promise resolves, so `stillHasAccess` already excludes the grant that was just dropped.
 
-- [ ] **Step 3: Trigger it from the document access list**
+- [x] **Step 3: Trigger it from the document access list**
 
 In `app/components/Sharing/Document/AccessControlList.tsx`, add the same callback but call it after `userMemberships.delete({ documentId, userId })`, excluding the document being removed from the check:
 
@@ -1464,11 +1464,11 @@ In `app/components/Sharing/Document/AccessControlList.tsx`, add the same callbac
           );
 ```
 
-- [ ] **Step 4: Verify by hand**
+- [x] **Step 4: Verify by hand**
 
 Remove a guest's only grant, confirm the prompt appears, cancel it once to confirm nothing is deleted, then confirm and check Settings → Members no longer lists the guest.
 
-- [ ] **Step 5: Type-check and commit**
+- [x] **Step 5: Type-check and commit**
 
 ```bash
 ./node_modules/.bin/tsc --noEmit
