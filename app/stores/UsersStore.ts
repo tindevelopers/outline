@@ -2,7 +2,11 @@ import commandScore from "command-score";
 import invariant from "invariant";
 import { deburr, differenceWith, orderBy } from "es-toolkit/compat";
 import { action, computed, makeObservable, override, runInAction } from "mobx";
-import type { CollectionPermission, DocumentPermission, UserRole } from "@shared/types";
+import type {
+  CollectionPermission,
+  DocumentPermission,
+  UserRole,
+} from "@shared/types";
 import User from "~/models/User";
 import { client } from "~/utils/ApiClient";
 import type RootStore from "./RootStore";

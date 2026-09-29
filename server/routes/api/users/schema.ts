@@ -222,12 +222,10 @@ export const UsersInviteSchema = z.object({
       z.object({
         email: z.email(),
         name: z.string(),
-        role: z
-          .enum(UserRole)
-          .refine((role) => role !== UserRole.Guest, {
-            error:
-              "Guests are invited to a specific collection or document with users.inviteGuest",
-          }),
+        role: z.enum(UserRole).refine((role) => role !== UserRole.Guest, {
+          error:
+            "Guests are invited to a specific collection or document with users.inviteGuest",
+        }),
         /** Grants platform admin. Honored only when the inviter is one. */
         platformAdmin: z.boolean().optional(),
       })

@@ -26,7 +26,11 @@ import {
 } from "@server/models/helpers/Filters";
 import { UserFlag } from "@server/models/User";
 import { can, authorize } from "@server/policies";
-import { presentUser, presentPolicies, presentMembership } from "@server/presenters";
+import {
+  presentUser,
+  presentPolicies,
+  presentMembership,
+} from "@server/presenters";
 import type { APIContext } from "@server/types";
 import { RateLimiterStrategy } from "@server/utils/RateLimiter";
 import { safeEqual } from "@server/utils/crypto";
