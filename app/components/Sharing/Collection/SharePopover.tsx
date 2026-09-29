@@ -14,7 +14,6 @@ import NudeButton from "~/components/NudeButton";
 import { createAction } from "~/actions";
 import { UserSection } from "~/actions/sections";
 import useBoolean from "~/hooks/useBoolean";
-import useCurrentTeam from "~/hooks/useCurrentTeam";
 import useKeyDown from "~/hooks/useKeyDown";
 import usePolicy from "~/hooks/usePolicy";
 import usePrevious from "~/hooks/usePrevious";
@@ -46,7 +45,6 @@ function SharePopover({
   onRequestClose,
   loading: externalLoading,
 }: Props) {
-  const team = useCurrentTeam();
   const { groupMemberships, users, groups, memberships, shares } = useStores();
   const { preload, loading: internalLoading } = useShareDataLoader({
     collection,
@@ -65,6 +63,12 @@ function SharePopover({
 
   const share = shares.getByCollectionId(collection.id);
   const prevPendingIds = usePrevious(pendingIds);
+
+  // An email address in the pending list becomes a guest, who cannot manage.
+  const hasGuestPending = React.useMemo(
+    () => pendingIds.some((id) => isEmail(id)),
+    [pendingIds]
+  );
 
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const suggestionsRef = React.useRef<HTMLDivElement | null>(null);
@@ -199,23 +203,18 @@ function SharePopover({
         perform: async () => {
           const invited = await Promise.all(
             pendingIds.map(async (idOrEmail) => {
-              let user, group;
-
-              // convert email to user
+              // An email address creates or reuses an outside collaborator
+              // scoped to this collection, rather than a workspace member.
               if (isEmail(idOrEmail)) {
-                const response = await users.invite([
-                  {
-                    email: idOrEmail,
-                    name: idOrEmail,
-                    role: team.defaultUserRole,
-                  },
-                ]);
-                user = response[0];
-              } else {
-                user = users.get(idOrEmail);
-                group = groups.get(idOrEmail);
+                return users.inviteGuest({
+                  email: idOrEmail,
+                  name: idOrEmail,
+                  collectionId: collection.id,
+                  permission,
+                });
               }
 
+              const user = users.get(idOrEmail);
               if (user) {
                 await memberships.create({
                   collectionId: collection.id,
@@ -225,6 +224,7 @@ function SharePopover({
                 return user;
               }
 
+              const group = groups.get(idOrEmail);
               if (group) {
                 await groupMemberships.create({
                   collectionId: collection.id,
@@ -295,28 +295,34 @@ function SharePopover({
       pendingIds,
       permission,
       t,
-      team.defaultUserRole,
       users,
     ]
   );
 
   const permissions = React.useMemo(
     () =>
-      [
-        {
-          label: t("View only"),
-          value: CollectionPermission.Read,
-        },
-        {
-          label: t("Can edit"),
-          value: CollectionPermission.ReadWrite,
-        },
-        {
-          label: t("Manage"),
-          value: CollectionPermission.Admin,
-        },
-      ] as Permission[],
-    [t]
+      (
+        [
+          {
+            label: t("View only"),
+            value: CollectionPermission.Read,
+          },
+          {
+            label: t("Can edit"),
+            value: CollectionPermission.ReadWrite,
+          },
+          {
+            label: t("Manage"),
+            value: CollectionPermission.Admin,
+          },
+        ] as Permission[]
+      ).filter(
+        // A guest can never hold manage, so it is not offered while an email
+        // address is pending.
+        (permission) =>
+          !hasGuestPending || permission.value !== CollectionPermission.Admin
+      ),
+    [t, hasGuestPending]
   );
 
   if (!hasRendered) {
