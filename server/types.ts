@@ -192,6 +192,14 @@ export type UserEvent = BaseEvent<User> &
           name: string;
         };
       }
+    | {
+        name: "users.invite_guest";
+        userId: string;
+        data: {
+          email: string;
+          name: string;
+        };
+      }
   );
 
 export type UserMembershipEvent = BaseEvent<UserMembership> & {

@@ -182,6 +182,7 @@ export default class DeliverWebhookTask extends BaseTask<Props> {
       case "users.activate":
       case "users.delete":
       case "users.invite":
+      case "users.invite_guest":
       case "users.promote":
       case "users.demote":
       case "users.invite_accepted":
