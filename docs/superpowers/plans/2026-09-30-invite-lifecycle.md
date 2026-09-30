@@ -37,6 +37,21 @@ Every commit message ends with:
 Co-authored-by: factory-droid[bot] <138933559+factory-droid[bot]@users.noreply.github.com>
 ```
 
+### The test database is never reset
+
+Nothing truncates between runs, and `globalTeardown.ts` only closes the connection. The database therefore accumulates rows from every previous run. This matters for `InviteReminderTask`, whose `perform()` scans **every** invited user in the database while its tests assert on global `Email.prototype.schedule` call counts. On a long-lived database, foreign invites are counted as sends and the per-row transactions can exceed the per-test timeout.
+
+When a reminder test fails with unexpected call counts or a timeout, verify against a clean database before assuming the code is wrong:
+
+```bash
+createdb -h 127.0.0.1 -U user outline-test-fresh
+NODE_ENV=test DATABASE_URL=postgres://user:pass@127.0.0.1:5432/outline-test-fresh ./node_modules/.bin/sequelize db:migrate
+NODE_ENV=test TZ=UTC DATABASE_URL=postgres://user:pass@127.0.0.1:5432/outline-test-fresh ./node_modules/.bin/vitest run <paths>
+dropdb -h 127.0.0.1 -U user outline-test-fresh
+```
+
+The password comes from `.env.test`. Drop the scratch database when finished; never drop or truncate the shared `outline-test`.
+
 ---
 
 ## File Structure
@@ -532,8 +547,12 @@ git commit -m "feat: start the invite clock when an invitation is sent"
 Create `server/models/helpers/InviteHelper.test.ts`:
 
 ```ts
-import { UserRole } from "@shared/types";
-import { buildCollection, buildDocument, buildInvite } from "@server/test/factories";
+import { CollectionPermission, DocumentPermission, UserRole } from "@shared/types";
+import {
+  buildCollection,
+  buildDocument,
+  buildInvite,
+} from "@server/test/factories";
 import { getGuestInviteItem } from "./InviteHelper";
 import UserMembership from "@server/models/UserMembership";
 
@@ -546,7 +565,7 @@ describe("getGuestInviteItem", () => {
     await UserMembership.create({
       userId: guest.id,
       collectionId: collection.id,
-      permission: "read",
+      permission: CollectionPermission.Read,
       createdById: guest.invitedById!,
     });
 
@@ -565,7 +584,7 @@ describe("getGuestInviteItem", () => {
     await UserMembership.create({
       userId: guest.id,
       documentId: document.id,
-      permission: "read",
+      permission: DocumentPermission.Read,
       createdById: guest.invitedById!,
     });
 
@@ -710,15 +729,34 @@ Replace the contents of `server/queues/tasks/InviteReminderTask.test.ts` with:
 
 ```ts
 import { subHours } from "date-fns";
-import { UserRole } from "@shared/types";
+import { CollectionPermission, UserRole } from "@shared/types";
 import InviteReminderEmail from "@server/emails/templates/InviteReminderEmail";
 import GuestInviteReminderEmail from "@server/emails/templates/GuestInviteReminderEmail";
-import { buildInvite } from "@server/test/factories";
+import UserMembership from "@server/models/UserMembership";
+import { buildCollection, buildInvite } from "@server/test/factories";
 import InviteReminderTask from "./InviteReminderTask";
 
 const hoursAgo = (hours: number) => subHours(new Date(), hours);
-const buildPendingGuest = (hours: number) =>
-  buildInvite({ role: UserRole.Guest, inviteLastSentAt: hoursAgo(hours) });
+
+/**
+ * A guest with an outstanding invite, holding one collection so the reminder
+ * has an item to name. A guest with no memberships cannot be reminded, so the
+ * fixture must create one.
+ */
+const buildPendingGuest = async (hours: number) => {
+  const guest = await buildInvite({
+    role: UserRole.Guest,
+    inviteLastSentAt: hoursAgo(hours),
+  });
+  const collection = await buildCollection({ teamId: guest.teamId });
+  await UserMembership.create({
+    userId: guest.id,
+    collectionId: collection.id,
+    permission: CollectionPermission.Read,
+    createdById: guest.invitedById!,
+  });
+  return guest;
+};
 
 describe("InviteReminderTask", () => {
   it("reminds a guest on day two, four and six, and then stops", async () => {
@@ -990,7 +1028,10 @@ export default class InviteReminderTask extends CronTask {
           return;
         }
 
-        await this.sendReminder(user);
+        const didSend = await this.sendReminder(user);
+        if (!didSend) {
+          return;
+        }
 
         user.incrementFlag(UserFlag.InviteReminderSent);
         await user.save({ transaction });
@@ -998,7 +1039,12 @@ export default class InviteReminderTask extends CronTask {
     }
   }
 
-  private async sendReminder(user: User) {
+  /**
+   * Sends the reminder for this user's role.
+   *
+   * @returns true when an email was sent, false when there is nothing to send.
+   */
+  private async sendReminder(user: User): Promise<boolean> {
     const invitedBy = user.invitedById
       ? await User.findByPk(user.invitedById)
       : undefined;
@@ -1006,7 +1052,7 @@ export default class InviteReminderTask extends CronTask {
     if (user.role === UserRole.Guest) {
       const item = await getGuestInviteItem(user.id);
       if (!item) {
-        return;
+        return false;
       }
 
       await new GuestInviteReminderEmail({
@@ -1020,7 +1066,7 @@ export default class InviteReminderTask extends CronTask {
         isCollection: item.isCollection,
         token: user.getInviteToken(),
       }).schedule();
-      return;
+      return true;
     }
 
     await new InviteReminderEmail({
@@ -1032,6 +1078,7 @@ export default class InviteReminderTask extends CronTask {
       teamName: user.team.name,
       teamUrl: user.team.url,
     }).schedule();
+    return true;
   }
 
   public get cron() {
