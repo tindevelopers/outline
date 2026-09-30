@@ -281,7 +281,7 @@ Expected: FAIL. `user.isInviteExpired is not a function`.
 In `shared/constants.ts`, add the import at the top:
 
 ```ts
-import { Hour } from "./utils/time";
+import { Day } from "./utils/time";
 ```
 
 and add `UserRole` to the existing value import from `./types`:
@@ -322,7 +322,7 @@ export const InviteLifecycle: Record<
 export const InviteMaxSends = 10;
 
 /** Minimum time between manual resends of the same invite. */
-export const InviteResendCooldownMs = Hour.ms;
+export const InviteResendCooldownMs = Day.ms;
 ```
 
 - [ ] **Step 4: Add the derived helpers and fix the token**
@@ -1978,7 +1978,9 @@ describe("inviteResender", () => {
   });
 
   it("refuses a second resend inside the cooldown", async () => {
-    const guest = await buildPendingGuest(1);
+    // Two hours, not one: the cooldown is 24 hours, and a one-hour-old invite
+    // would also be refused by a one-hour cooldown, so it proves nothing.
+    const guest = await buildPendingGuest(2);
     const admin = await buildAdmin({ teamId: guest.teamId });
     const collection = await buildCollection({ teamId: guest.teamId });
     await UserMembership.create({
@@ -1991,6 +1993,24 @@ describe("inviteResender", () => {
     await expect(
       inviteResender(createContext({ user: admin }), { user: guest })
     ).rejects.toThrow(/recently/);
+  });
+
+  it("allows a resend once the cooldown has elapsed", async () => {
+    const guest = await buildPendingGuest(25);
+    const admin = await buildAdmin({ teamId: guest.teamId });
+    const collection = await buildCollection({ teamId: guest.teamId });
+    await UserMembership.create({
+      userId: guest.id,
+      collectionId: collection.id,
+      permission: CollectionPermission.Read,
+      createdById: admin.id,
+    });
+    const spy = vi.spyOn(GuestInviteEmail.prototype, "schedule");
+
+    await inviteResender(createContext({ user: admin }), { user: guest });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 
   it("refuses once the send ceiling is reached", async () => {
