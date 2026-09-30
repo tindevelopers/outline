@@ -170,6 +170,12 @@ class User extends ParanoidModel<
   @SkipChangeset
   lastActiveAt: Date | null;
 
+  /** When the outstanding invitation was last emailed, or null. */
+  @IsDate
+  @Column(DataType.DATE)
+  @SkipChangeset
+  inviteLastSentAt: Date | null;
+
   @IsIP
   @SkipChangeset
   @Column(DataType.STRING)
