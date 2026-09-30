@@ -8,6 +8,7 @@ import { DocumentPermission } from "@shared/types";
 import type User from "~/models/User";
 import type UserMembership from "~/models/UserMembership";
 import { Avatar, AvatarSize } from "~/components/Avatar";
+import Button from "~/components/Button";
 import InputMemberPermissionSelect from "~/components/InputMemberPermissionSelect";
 import Time from "~/components/Time";
 import type { Permission } from "~/types";
@@ -21,6 +22,7 @@ type Props = {
   onRemove?: () => void;
   onLeave?: () => void;
   onUpdate?: (permission: DocumentPermission) => void;
+  onResend?: () => void;
 };
 
 const DocumentMemberListItem = ({
@@ -29,6 +31,7 @@ const DocumentMemberListItem = ({
   onRemove,
   onLeave,
   onUpdate,
+  onResend,
 }: Props) => {
   const { t } = useTranslation();
 
@@ -95,8 +98,10 @@ const DocumentMemberListItem = ({
           </Trans>
         ) : user.isSuspended ? (
           t("Suspended")
+        ) : user.isInviteExpired ? (
+          t("Invite expired")
         ) : user.isInvited ? (
-          t("Invited")
+          t("Invite pending")
         ) : user.lastActiveAt ? (
           <Trans>
             Active <Time dateTime={user.lastActiveAt} /> ago
@@ -107,6 +112,11 @@ const DocumentMemberListItem = ({
       }
       actions={
         <div style={{ marginRight: -8 }}>
+          {onResend && (
+            <Button onClick={onResend} neutral small>
+              {t("Resend")}
+            </Button>
+          )}
           <InputMemberPermissionSelect
             permissions={
               onLeave

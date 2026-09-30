@@ -21,6 +21,8 @@ type UserPresentation = {
   updatedAt: Date;
   deletedAt: Date | null;
   lastActiveAt: Date | null;
+  /** When the outstanding invitation stops working, or null. */
+  inviteExpiresAt?: Date | null;
   color: string;
   role: UserRole;
   isSuspended: boolean;
@@ -48,6 +50,7 @@ export default function presentUser(
     updatedAt: user.updatedAt,
     deletedAt: user.deletedAt,
     lastActiveAt: user.lastActiveAt,
+    inviteExpiresAt: user.getInviteExpiresAt(),
     timezone: user.timezone,
   };
 

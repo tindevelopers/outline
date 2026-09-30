@@ -34,7 +34,7 @@ type Props = {
 };
 
 function DocumentMemberList({ document, invitedInSession }: Props) {
-  const { userMemberships, groupMemberships, memberships, dialogs } =
+  const { userMemberships, groupMemberships, memberships, dialogs, users } =
     useStores();
 
   const user = useCurrentUser();
@@ -247,6 +247,11 @@ function DocumentMemberList({ document, invitedInSession }: Props) {
           user={item}
           membership={item.getMembership(document)}
           onRemove={() => handleRemoveUser(item)}
+          onResend={
+            item.isInvited && can.inviteGuest
+              ? () => void users.resendInvite(item)
+              : undefined
+          }
           onUpdate={
             can.manageUsers
               ? (permission) => handleUpdateUser(item, permission)
