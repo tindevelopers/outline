@@ -10,6 +10,33 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-30-guest-invite-lifecycle-design.md`
 
+## Environment
+
+The `yarn` on this machine is v1, but the repo expects v4, so any script that shells out to `yarn <bin>` fails. Invoke binaries from `./node_modules/.bin/` directly. The development database is not configured; only the test database is.
+
+```bash
+# tests
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run <path>
+
+# migrations (test database)
+NODE_ENV=test ./node_modules/.bin/sequelize db:migrate
+NODE_ENV=test ./node_modules/.bin/sequelize db:migrate:undo
+
+# psql
+u="$(grep '^DATABASE_URL=' .env.test | cut -d= -f2-)"; psql "$u" -c '<sql>'
+
+# static checks
+./node_modules/.bin/tsc --noEmit
+./node_modules/.bin/oxfmt <paths>
+./node_modules/.bin/oxlint --type-aware app server shared plugins
+```
+
+Every commit message ends with:
+
+```
+Co-authored-by: factory-droid[bot] <138933559+factory-droid[bot]@users.noreply.github.com>
+```
+
 ---
 
 ## File Structure
@@ -47,6 +74,8 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
+    // Schema changes commit first so the ACCESS EXCLUSIVE lock taken by
+    // ADD COLUMN is released before the backfill touches every row.
     await queryInterface.sequelize.transaction(async (transaction) => {
       await queryInterface.addColumn(
         "users",
@@ -61,27 +90,32 @@ module.exports = {
       await queryInterface.addIndex("users", ["inviteLastSentAt"], {
         transaction,
       });
-
-      // Existing invites start their clock at creation, and are marked as
-      // already notified. Without the flag, every invite that expired before
-      // this shipped would mail a notice to a real person on the first run.
-      await queryInterface.sequelize.query(
-        `UPDATE users
-            SET "inviteLastSentAt" = "createdAt",
-                flags = jsonb_set(
-                  COALESCE(flags, '{}'::jsonb),
-                  '{inviteExpiryNotified}',
-                  '1'::jsonb,
-                  true
-                )
-          WHERE "lastActiveAt" IS NULL
-            AND "deletedAt" IS NULL`,
-        { transaction }
-      );
     });
+
+    // Existing invites start their clock at creation, and are marked as
+    // already notified. Without the flag, every invite that expired before
+    // this shipped would mail a notice to a real person on the first run.
+    // A failure here is safe: a null clock means no reminders and no expiry
+    // notice, and getInviteToken falls back to its thirty day lifetime.
+    await queryInterface.sequelize.query(
+      `UPDATE users
+          SET "inviteLastSentAt" = "createdAt",
+              flags = jsonb_set(
+                COALESCE(flags, '{}'::jsonb),
+                '{inviteExpiryNotified}',
+                '1'::jsonb,
+                true
+              )
+        WHERE "lastActiveAt" IS NULL
+          AND "deletedAt" IS NULL`
+    );
   },
 
   async down(queryInterface, Sequelize) {
+    // The inviteExpiryNotified flag is intentionally left behind: removing a
+    // single key from a shared JSONB blob risks clobbering a value the
+    // running application has set, and re-running up re-suppresses notices,
+    // which is the safe direction.
     await queryInterface.sequelize.transaction(async (transaction) => {
       await queryInterface.removeIndex("users", ["inviteLastSentAt"], {
         transaction,
@@ -94,24 +128,33 @@ module.exports = {
 };
 ```
 
+The backfill is deliberately outside the schema transaction. Holding an `ACCESS EXCLUSIVE` lock across a bulk update of every invited row would block all reads and writes to `users` for the duration.
+
 - [ ] **Step 2: Add the model attribute**
 
-In `server/models/User.ts`, immediately after the `lastActiveAt` column declaration:
+In `server/models/User.ts`, immediately after the `lastActiveAt` column declaration. Match the neighbouring date columns, which all carry both decorators; `lastSigninEmailSentAt` is the closest analogue. Without `@SkipChangeset` every later save that sets this field would add an audit event.
 
 ```ts
   /** When the outstanding invitation was last emailed, or null. */
+  @IsDate
   @Column(DataType.DATE)
+  @SkipChangeset
   inviteLastSentAt: Date | null;
 ```
 
 - [ ] **Step 3: Run the migration and confirm the column**
 
+Migrations target the test database, which is the only one configured here:
+
 ```bash
-yarn db:migrate
-psql "$DATABASE_URL" -c '\d users' | grep inviteLastSentAt
+NODE_ENV=test ./node_modules/.bin/sequelize db:migrate
+u="$(grep '^DATABASE_URL=' .env.test | cut -d= -f2-)"
+psql "$u" -c '\d users' | grep inviteLastSentAt
 ```
 
 Expected: the column is listed as `timestamp with time zone`.
+
+Note the two-step variable assignment. `DATABASE_URL="$(...)" psql "$DATABASE_URL"` does not work: the shell expands the argument before the prefix assignment takes effect, so `psql` receives an empty URL.
 
 - [ ] **Step 4: Commit**
 
@@ -213,7 +256,7 @@ and add `buildInvite` to the existing `@server/test/factories` import list.
 - [ ] **Step 2: Run the tests to verify they fail**
 
 ```bash
-yarn test server/models/User.test.ts -t "invite lifecycle"
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/models/User.test.ts -t "invite lifecycle"
 ```
 
 Expected: FAIL. `user.isInviteExpired is not a function`.
@@ -338,7 +381,7 @@ Replace the existing `getInviteToken` with:
 - [ ] **Step 5: Run the tests to verify they pass**
 
 ```bash
-yarn test server/models/User.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/models/User.test.ts
 ```
 
 Expected: PASS, including the pre-existing cases in the file.
@@ -419,7 +462,7 @@ Match the imports already present in those files (`createContext`, `buildTeam`, 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 ```bash
-yarn test server/commands/guestInviter.test.ts server/commands/userInviter.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/commands/guestInviter.test.ts server/commands/userInviter.test.ts
 ```
 
 Expected: FAIL, `expected null to be an instance of Date`.
@@ -461,7 +504,7 @@ In `server/test/factories.ts`, in `buildInvite`, add after the `createdAt` line 
 - [ ] **Step 5: Run the tests to verify they pass**
 
 ```bash
-yarn test server/commands/guestInviter.test.ts server/commands/userInviter.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/commands/guestInviter.test.ts server/commands/userInviter.test.ts
 ```
 
 Expected: PASS.
@@ -544,7 +587,7 @@ describe("getGuestInviteItem", () => {
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-yarn test server/models/helpers/InviteHelper.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/models/helpers/InviteHelper.test.ts
 ```
 
 Expected: FAIL, cannot resolve `./InviteHelper`.
@@ -654,7 +697,7 @@ export async function actorManagesAnyItemOf(
 - [ ] **Step 4: Run it to verify it passes**
 
 ```bash
-yarn test server/models/helpers/InviteHelper.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/models/helpers/InviteHelper.test.ts
 ```
 
 Expected: PASS.
@@ -753,7 +796,7 @@ describe("InviteReminderTask", () => {
 - [ ] **Step 6: Run them to verify they fail**
 
 ```bash
-yarn test server/queues/tasks/InviteReminderTask.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/queues/tasks/InviteReminderTask.test.ts
 ```
 
 Expected: FAIL. The guest reminder template does not exist yet, and the task still uses the two-to-three-day query.
@@ -1009,7 +1052,7 @@ The expiry branch is intentionally a bare `return` for now; Task 6 fills it in.
 - [ ] **Step 9: Run the tests to verify they pass**
 
 ```bash
-yarn test server/queues/tasks/InviteReminderTask.test.ts server/models/helpers/InviteHelper.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/queues/tasks/InviteReminderTask.test.ts server/models/helpers/InviteHelper.test.ts
 ```
 
 Expected: PASS.
@@ -1131,7 +1174,7 @@ import { Notification, User } from "@server/models";
 - [ ] **Step 2: Run them to verify they fail**
 
 ```bash
-yarn test server/queues/tasks/InviteReminderTask.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/queues/tasks/InviteReminderTask.test.ts
 ```
 
 Expected: FAIL, `NotificationEventType.InviteExpired` is undefined.
@@ -1428,7 +1471,7 @@ import type { Transaction } from "sequelize";
 - [ ] **Step 8: Run the tests to verify they pass**
 
 ```bash
-yarn test server/queues/tasks/InviteReminderTask.test.ts server/models/helpers/InviteHelper.test.ts server/models/Notification.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/queues/tasks/InviteReminderTask.test.ts server/models/helpers/InviteHelper.test.ts server/models/Notification.test.ts
 ```
 
 Expected: PASS.
@@ -1621,7 +1664,7 @@ describe("inviteResender", () => {
 - [ ] **Step 2: Run them to verify they fail**
 
 ```bash
-yarn test server/commands/inviteResender.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/commands/inviteResender.test.ts
 ```
 
 Expected: FAIL, cannot resolve `./inviteResender`.
@@ -1734,7 +1777,7 @@ export default async function inviteResender(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
-yarn test server/commands/inviteResender.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/commands/inviteResender.test.ts
 ```
 
 Expected: PASS.
@@ -1793,7 +1836,7 @@ rg -n "InviteEmail" server/routes/api/users/users.ts
 - [ ] **Step 6: Run the route tests**
 
 ```bash
-yarn test server/routes/api/users/users.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/routes/api/users/users.test.ts
 ```
 
 Expected: PASS. If a test asserted the old "sent too many times" threshold at three sends, update it to the new `InviteMaxSends` constant rather than a literal.
@@ -1846,7 +1889,7 @@ This file builds users with `User.build` rather than the factories, so no databa
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-yarn test server/presenters/user.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/presenters/user.test.ts
 ```
 
 Expected: FAIL, `inviteExpiresAt` is undefined.
@@ -1870,7 +1913,7 @@ and add to the returned object in `presentUser`:
 - [ ] **Step 4: Run it to verify it passes**
 
 ```bash
-yarn test server/presenters/user.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/presenters/user.test.ts
 ```
 
 Expected: PASS.
@@ -2085,8 +2128,8 @@ and add the resend button inside the actions wrapper, before the permission sele
 - [ ] **Step 9: Type-check and run the frontend tests**
 
 ```bash
-yarn tsc
-yarn test app
+./node_modules/.bin/tsc --noEmit
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run app
 ```
 
 Expected: tsc clean, tests pass.
@@ -2107,17 +2150,17 @@ git commit -m "feat: show pending and expired invites with a resend action"
 - [ ] **Step 1: Type-check, format, and lint**
 
 ```bash
-yarn tsc
+./node_modules/.bin/tsc --noEmit
 ./node_modules/.bin/oxfmt --check app server shared
-yarn lint
+./node_modules/.bin/oxlint --type-aware app server shared plugins
 ```
 
-Expected: tsc clean, no format issues in files this plan touched, zero lint errors.
+Expected: tsc clean, no format issues in files this plan touched, zero lint errors in them.
 
 - [ ] **Step 2: Run every suite this plan touches**
 
 ```bash
-yarn test server/models/User.test.ts server/models/helpers/InviteHelper.test.ts server/queues/tasks/InviteReminderTask.test.ts server/commands/inviteResender.test.ts server/commands/guestInviter.test.ts server/commands/userInviter.test.ts server/presenters/user.test.ts server/routes/api/users/users.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/models/User.test.ts server/models/helpers/InviteHelper.test.ts server/queues/tasks/InviteReminderTask.test.ts server/commands/inviteResender.test.ts server/commands/guestInviter.test.ts server/commands/userInviter.test.ts server/presenters/user.test.ts server/routes/api/users/users.test.ts
 ```
 
 Expected: all pass.
@@ -2125,9 +2168,9 @@ Expected: all pass.
 - [ ] **Step 3: Confirm the migration is reversible**
 
 ```bash
-yarn db:migrate:undo
+NODE_ENV=test ./node_modules/.bin/sequelize db:migrate:undo
 psql "$DATABASE_URL" -c '\d users' | grep -c inviteLastSentAt
-yarn db:migrate
+NODE_ENV=test ./node_modules/.bin/sequelize db:migrate
 ```
 
 Expected: the count is 0 after the undo, and the column is present again after re-running.
