@@ -1,5 +1,6 @@
 import { subDays } from "date-fns";
 import jwt from "jsonwebtoken";
+import type { MockInstance } from "vitest";
 import {
   CollectionPermission,
   NotificationEventType,
@@ -28,6 +29,19 @@ const tokenLifetimeMs = (token: string): number => {
 };
 
 const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * The item names carried by every reminder email this spy sent. The context is
+ * annotated structurally because `props` is not public on the email base class.
+ */
+const remindedItems = (spy: MockInstance) =>
+  spy.mock.contexts.map(
+    (context: { props: { itemName: string } }) => context.props.itemName
+  );
+
+/** The notifications this spy created for a specific event. */
+const notificationsFor = (spy: MockInstance, event: NotificationEventType) =>
+  spy.mock.calls.filter(([values]) => values?.event === event);
 
 describe("invite lifecycle end to end", () => {
   it("reminds, expires, notifies the manager, and resends", async () => {
@@ -67,9 +81,7 @@ describe("invite lifecycle end to end", () => {
     );
     await new InviteReminderTask().perform();
     expect(reminderSpy).toHaveBeenCalledTimes(1);
-    expect(reminderSpy.mock.contexts[0]).toMatchObject({
-      props: { itemName: collection.name },
-    });
+    expect(remindedItems(reminderSpy)).toEqual([collection.name]);
     reminderSpy.mockRestore();
     await guest.reload();
     expect(guest.getFlag(UserFlag.InviteReminderSent)).toBe(1);
@@ -92,16 +104,17 @@ describe("invite lifecycle end to end", () => {
 
     // The notice reaches the inviter and the manager of the item the guest
     // holds, exactly once each, and names the invitee.
-    const expiryCalls = notificationSpy.mock.calls.filter(
-      ([values]) => values?.event === NotificationEventType.InviteExpired
+    const expiryCalls = notificationsFor(
+      notificationSpy,
+      NotificationEventType.InviteExpired
     );
-    const recipients = expiryCalls.map(([values]) => values?.userId);
+    const recipients = expiryCalls.map(([values]) => values.userId);
     expect(new Set(recipients)).toEqual(
       new Set([guest.invitedById, manager.id])
     );
     expect(recipients).toHaveLength(2);
     for (const [values] of expiryCalls) {
-      expect(values?.data).toEqual({ inviteeName: guest.name });
+      expect(values.data).toEqual({ inviteeName: guest.name });
     }
     notificationSpy.mockRestore();
 
@@ -109,9 +122,7 @@ describe("invite lifecycle end to end", () => {
     const secondRunSpy = vi.spyOn(Notification, "create");
     await new InviteReminderTask().perform();
     expect(
-      secondRunSpy.mock.calls.filter(
-        ([values]) => values?.event === NotificationEventType.InviteExpired
-      )
+      notificationsFor(secondRunSpy, NotificationEventType.InviteExpired)
     ).toHaveLength(0);
     secondRunSpy.mockRestore();
 
