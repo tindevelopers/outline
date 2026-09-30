@@ -7,7 +7,11 @@ import {
 } from "@shared/types";
 import InviteReminderEmail from "@server/emails/templates/InviteReminderEmail";
 import GuestInviteReminderEmail from "@server/emails/templates/GuestInviteReminderEmail";
-import { buildCollection, buildInvite } from "@server/test/factories";
+import {
+  buildAdmin,
+  buildCollection,
+  buildInvite,
+} from "@server/test/factories";
 import { Notification, User } from "@server/models";
 import UserMembership from "@server/models/UserMembership";
 import { UserFlag } from "@server/models/User";
@@ -179,6 +183,66 @@ describe("InviteReminderTask", () => {
     await new InviteReminderTask().perform();
 
     expect(notifiedFor(spy, guest.name)).toBe(0);
+    spy.mockRestore();
+  });
+
+  it("notifies the inviter and a manager of an item the guest holds", async () => {
+    const guest = await buildPendingGuest(200);
+    const inviter = (await User.findByPk(guest.invitedById!))!;
+    const membership = (await UserMembership.findOne({
+      where: { userId: guest.id },
+    }))!;
+    // A second person who manages the collection the guest holds. The
+    // collection's creator also holds admin, so this test asserts on the
+    // specific recipients rather than the total.
+    const manager = await buildAdmin({ teamId: guest.teamId });
+    await UserMembership.create({
+      userId: manager.id,
+      collectionId: membership.collectionId!,
+      permission: CollectionPermission.Admin,
+      createdById: manager.id,
+    });
+    const spy = vi.spyOn(Notification, "create");
+
+    await new InviteReminderTask().perform();
+
+    const notifiedUserIds = spy.mock.calls
+      .filter(([args]) => args?.data?.inviteeName === guest.name)
+      .map(([args]) => args?.userId);
+    expect(notifiedUserIds).toContain(inviter.id);
+    expect(notifiedUserIds).toContain(manager.id);
+    expect(notifiedUserIds.filter((id) => id === inviter.id)).toHaveLength(1);
+    expect(notifiedUserIds.filter((id) => id === manager.id)).toHaveLength(1);
+    spy.mockRestore();
+  });
+
+  it("notifies a manager who is also the inviter exactly once", async () => {
+    const guest = await buildInvite({
+      role: UserRole.Guest,
+      inviteLastSentAt: hoursAgo(200),
+    });
+    const inviter = (await User.findByPk(guest.invitedById!))!;
+    // The inviter is the collection's creator, so they are both the inviter
+    // and a manager of the item the guest holds.
+    const collection = await buildCollection({
+      teamId: guest.teamId,
+      createdById: inviter.id,
+    });
+    await UserMembership.create({
+      userId: guest.id,
+      collectionId: collection.id,
+      permission: CollectionPermission.Read,
+      createdById: inviter.id,
+    });
+    const spy = vi.spyOn(Notification, "create");
+
+    await new InviteReminderTask().perform();
+
+    expect(notifiedFor(spy, guest.name)).toBe(1);
+    const notifiedUserIds = spy.mock.calls
+      .filter(([args]) => args?.data?.inviteeName === guest.name)
+      .map(([args]) => args?.userId);
+    expect(notifiedUserIds).toEqual([inviter.id]);
     spy.mockRestore();
   });
 });
