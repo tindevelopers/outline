@@ -9,6 +9,7 @@ import DocumentAccessRequestEmail from "@server/emails/templates/DocumentAccessR
 import DocumentMentionedEmail from "@server/emails/templates/DocumentMentionedEmail";
 import DocumentPublishedOrUpdatedEmail from "@server/emails/templates/DocumentPublishedOrUpdatedEmail";
 import DocumentSharedEmail from "@server/emails/templates/DocumentSharedEmail";
+import InviteExpiredEmail from "@server/emails/templates/InviteExpiredEmail";
 import { Notification } from "@server/models";
 import type { Event, NotificationEvent } from "@server/types";
 import BaseProcessor from "./BaseProcessor";
@@ -217,6 +218,23 @@ export default class EmailsProcessor extends BaseProcessor {
             to: notification.user.email,
             documentId: notification.documentId,
             actorId: notification.actorId,
+            teamUrl: notification.team.url,
+          },
+          { notificationId: notification.id }
+        ).schedule({
+          delay: Minute.ms,
+        });
+        return;
+      }
+
+      case NotificationEventType.InviteExpired: {
+        await new InviteExpiredEmail(
+          {
+            to: notification.user.email,
+            language: notification.user.language,
+            userId: notification.userId,
+            inviteeName: notification.data?.inviteeName ?? "Someone",
+            teamName: notification.team.name,
             teamUrl: notification.team.url,
           },
           { notificationId: notification.id }

@@ -81,6 +81,7 @@ import { SkipChangeset } from "./decorators/Changeset";
 export enum UserFlag {
   InviteSent = "inviteSent",
   InviteReminderSent = "inviteReminderSent",
+  InviteExpiryNotified = "inviteExpiryNotified",
   Desktop = "desktop",
   DesktopWeb = "desktopWeb",
   MobileWeb = "mobileWeb",

@@ -1,12 +1,15 @@
 import { subDays } from "date-fns";
-import { Op } from "sequelize";
+import { Op, type Transaction } from "sequelize";
 import { InviteLifecycle } from "@shared/constants";
-import { UserRole } from "@shared/types";
+import { NotificationEventType, UserRole } from "@shared/types";
 import { Day } from "@shared/utils/time";
 import GuestInviteReminderEmail from "@server/emails/templates/GuestInviteReminderEmail";
 import InviteReminderEmail from "@server/emails/templates/InviteReminderEmail";
-import { User } from "@server/models";
-import { getGuestInviteItem } from "@server/models/helpers/InviteHelper";
+import { Notification, User } from "@server/models";
+import {
+  getGuestInviteItem,
+  managerIdsFor,
+} from "@server/models/helpers/InviteHelper";
 import { UserFlag } from "@server/models/User";
 import { sequelize } from "@server/storage/database";
 import { TaskPriority } from "./base/BaseTask";
@@ -41,6 +44,11 @@ export default class InviteReminderTask extends CronTask {
         }
 
         if (user.isInviteExpired()) {
+          if (user.getFlag(UserFlag.InviteExpiryNotified) === 0) {
+            await this.notifyExpiry(user, transaction);
+            user.incrementFlag(UserFlag.InviteExpiryNotified);
+            await user.save({ transaction });
+          }
           return;
         }
 
@@ -70,6 +78,61 @@ export default class InviteReminderTask extends CronTask {
         await user.save({ transaction });
       });
     }
+  }
+
+  /**
+   * Tells the inviter, and anyone who manages an item the invitee holds, that
+   * the invitation expired. Fires once per invite.
+   *
+   * @param user the invitee whose window has closed.
+   * @param transaction the transaction the flag update is committed in.
+   */
+  private async notifyExpiry(
+    user: User,
+    transaction: Transaction
+  ): Promise<void> {
+    for (const recipient of await this.expiryRecipients(user)) {
+      if (
+        recipient.isSuspended ||
+        !recipient.subscribedToEventType(NotificationEventType.InviteExpired)
+      ) {
+        continue;
+      }
+
+      await Notification.create(
+        {
+          event: NotificationEventType.InviteExpired,
+          userId: recipient.id,
+          teamId: user.teamId,
+          data: { inviteeName: user.name },
+          // The inviter is the actor where known. An invitee is never named as
+          // the actor of their own expiry, so the actor is left null otherwise.
+          ...(user.invitedById ? { actorId: user.invitedById } : {}),
+        },
+        { transaction }
+      );
+    }
+  }
+
+  /**
+   * The inviter, plus every user who manages a collection or document the
+   * invitee holds. Group-derived access is not considered.
+   *
+   * @param user the invitee whose window has closed.
+   * @returns the deduplicated recipients.
+   */
+  private async expiryRecipients(user: User): Promise<User[]> {
+    const ids = new Set<string>();
+
+    if (user.invitedById) {
+      ids.add(user.invitedById);
+    }
+
+    for (const id of await managerIdsFor(user.id)) {
+      ids.add(id);
+    }
+
+    return User.findAll({ where: { id: { [Op.in]: [...ids] } } });
   }
 
   /**

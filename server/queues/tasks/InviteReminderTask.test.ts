@@ -1,9 +1,14 @@
 import { subHours } from "date-fns";
 import type { MockInstance } from "vitest";
-import { CollectionPermission, UserRole } from "@shared/types";
+import {
+  CollectionPermission,
+  NotificationEventType,
+  UserRole,
+} from "@shared/types";
 import InviteReminderEmail from "@server/emails/templates/InviteReminderEmail";
 import GuestInviteReminderEmail from "@server/emails/templates/GuestInviteReminderEmail";
 import { buildCollection, buildInvite } from "@server/test/factories";
+import { Notification, User } from "@server/models";
 import UserMembership from "@server/models/UserMembership";
 import { UserFlag } from "@server/models/User";
 import InviteReminderTask from "./InviteReminderTask";
@@ -13,6 +18,11 @@ const sentTo = (spy: MockInstance, email: string | null) =>
   spy.mock.contexts.filter(
     (context: { props: { to?: string | null } }) => context.props.to === email
   ).length;
+
+/** Notifications this spy created that name a specific invitee. */
+const notifiedFor = (spy: MockInstance, inviteeName: string) =>
+  spy.mock.calls.filter(([args]) => args?.data?.inviteeName === inviteeName)
+    .length;
 
 const hoursAgo = (hours: number) => subHours(new Date(), hours);
 const buildPendingGuest = async (hours: number) => {
@@ -116,6 +126,59 @@ describe("InviteReminderTask", () => {
     await guest.reload();
     expect(sentTo(spy, guest.email)).toBe(0);
     expect(guest.getFlag(UserFlag.InviteReminderSent)).toBe(0);
+    spy.mockRestore();
+  });
+
+  it("notifies the inviter once when a guest invite expires", async () => {
+    const guest = await buildInvite({
+      role: UserRole.Guest,
+      inviteLastSentAt: hoursAgo(200),
+    });
+    const inviter = (await User.findByPk(guest.invitedById!))!;
+    const spy = vi.spyOn(Notification, "create");
+
+    await new InviteReminderTask().perform();
+    expect(notifiedFor(spy, guest.name)).toBe(1);
+
+    const callsForInvitee = spy.mock.calls.filter(
+      ([args]) => args?.data?.inviteeName === guest.name
+    );
+    expect(callsForInvitee).toHaveLength(1);
+    expect(callsForInvitee[0][0]).toMatchObject({
+      event: NotificationEventType.InviteExpired,
+      userId: inviter.id,
+      data: { inviteeName: guest.name },
+    });
+
+    // A second run must not notify again.
+    await new InviteReminderTask().perform();
+    expect(notifiedFor(spy, guest.name)).toBe(1);
+
+    spy.mockRestore();
+  });
+
+  it("does not notify for an invite that is still live", async () => {
+    const guest = await buildPendingGuest(50);
+    const spy = vi.spyOn(Notification, "create");
+
+    await new InviteReminderTask().perform();
+
+    expect(notifiedFor(spy, guest.name)).toBe(0);
+    spy.mockRestore();
+  });
+
+  it("does not notify for an invite that was accepted", async () => {
+    const guest = await buildInvite({
+      role: UserRole.Guest,
+      inviteLastSentAt: hoursAgo(200),
+    });
+    guest.lastActiveAt = new Date();
+    await guest.save();
+    const spy = vi.spyOn(Notification, "create");
+
+    await new InviteReminderTask().perform();
+
+    expect(notifiedFor(spy, guest.name)).toBe(0);
     spy.mockRestore();
   });
 });

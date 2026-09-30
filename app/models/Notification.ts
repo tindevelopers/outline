@@ -61,6 +61,7 @@ class Notification extends Model {
       ],
       system: [
         NotificationEventType.InviteAccepted,
+        NotificationEventType.InviteExpired,
         NotificationEventType.Onboarding,
         NotificationEventType.Features,
         NotificationEventType.ExportCompleted,
@@ -279,6 +280,9 @@ class Notification extends Model {
           : this.document?.path;
       }
       case NotificationEventType.InviteAccepted: {
+        return settingsPath("users");
+      }
+      case NotificationEventType.InviteExpired: {
         return settingsPath("users");
       }
       case NotificationEventType.Onboarding:

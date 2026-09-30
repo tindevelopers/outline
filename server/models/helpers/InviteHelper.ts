@@ -95,3 +95,40 @@ export async function actorManagesAnyItemOf(
 
   return !!managed;
 }
+
+/**
+ * Ids of every user who holds manage permission on a collection or document
+ * the given user has access to. Group-derived access is not considered.
+ *
+ * @param userId the invited user's id.
+ * @returns the manager ids, possibly empty.
+ */
+export async function managerIdsFor(userId: string): Promise<string[]> {
+  const memberships = await UserMembership.findAll({ where: { userId } });
+  const collectionIds = memberships
+    .map((membership) => membership.collectionId)
+    .filter((id): id is string => !!id);
+  const documentIds = memberships
+    .map((membership) => membership.documentId)
+    .filter((id): id is string => !!id);
+
+  if (!collectionIds.length && !documentIds.length) {
+    return [];
+  }
+
+  const managers = await UserMembership.findAll({
+    where: {
+      permission: CollectionPermission.Admin,
+      [Op.or]: [
+        ...(collectionIds.length
+          ? [{ collectionId: { [Op.in]: collectionIds } }]
+          : []),
+        ...(documentIds.length
+          ? [{ documentId: { [Op.in]: documentIds } }]
+          : []),
+      ],
+    },
+  });
+
+  return [...new Set(managers.map((membership) => membership.userId))];
+}
