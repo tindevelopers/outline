@@ -15,19 +15,23 @@ import { sequelize } from "@server/storage/database";
 import { TaskPriority } from "./base/BaseTask";
 import { CronTask, TaskInterval } from "./base/CronTask";
 
+/** The longest invite window, so expired invites stay scannable long enough to be noticed. */
+const MaxInviteWindowDays = Math.max(
+  ...Object.values(InviteLifecycle).map(({ windowDays }) => windowDays)
+);
+
 export default class InviteReminderTask extends CronTask {
   public async perform() {
     // An invite younger than two days cannot be due a reminder, since two is
-    // the earliest offset for any role.
+    // the earliest offset for any role. The upper bound sits two days past the
+    // longest window so an invite that expired on the previous daily run is
+    // still scanned and its expiry notice can fire.
     const users = await User.scope("invited").findAll({
       attributes: ["id"],
       where: {
         inviteLastSentAt: {
-          // Two days is the earliest reminder offset for any role, so a
-          // younger invite cannot be due. The 30 day bound matches the longest
-          // window, so expired invites are not re-scanned forever.
           [Op.lt]: subDays(new Date(), 2),
-          [Op.gt]: subDays(new Date(), 30),
+          [Op.gt]: subDays(new Date(), MaxInviteWindowDays + 2),
         },
       },
     });
@@ -105,9 +109,11 @@ export default class InviteReminderTask extends CronTask {
           userId: recipient.id,
           teamId: user.teamId,
           data: { inviteeName: user.name },
-          // The inviter is the actor where known. An invitee is never named as
-          // the actor of their own expiry, so the actor is left null otherwise.
-          ...(user.invitedById ? { actorId: user.invitedById } : {}),
+          // `actorId` is not nullable and the processor's `withActor` scope is
+          // an inner join, so a null actor would drop the notification before
+          // the email is scheduled. Fall back to the invitee, which only
+          // happens for invites with no recorded inviter.
+          actorId: user.invitedById ?? user.id,
         },
         { transaction }
       );
@@ -122,6 +128,8 @@ export default class InviteReminderTask extends CronTask {
    * @returns the deduplicated recipients.
    */
   private async expiryRecipients(user: User): Promise<User[]> {
+    // The Set is belt-and-braces: the `Op.in` query below collapses duplicate
+    // ids anyway, so it is not what enforces the dedupe contract.
     const ids = new Set<string>();
 
     if (user.invitedById) {

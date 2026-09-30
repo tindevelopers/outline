@@ -215,7 +215,7 @@ class Notification extends Model {
       case NotificationEventType.AddUserToCollection:
         return t("invited you to");
       case NotificationEventType.InviteExpired:
-        return t("invite expired for");
+        return t("had an invite expire for");
       case NotificationEventType.RequestDocumentAccess:
         if (this.accessRequestStatus === "approved") {
           return t("was granted access to");

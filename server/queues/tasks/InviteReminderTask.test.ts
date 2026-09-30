@@ -245,4 +245,58 @@ describe("InviteReminderTask", () => {
     expect(notifiedUserIds).toEqual([inviter.id]);
     spy.mockRestore();
   });
+
+  it("notifies the inviter when a member invite expires", async () => {
+    const member = await buildInvite({
+      role: UserRole.Member,
+      inviteLastSentAt: hoursAgo(24 * 31),
+    });
+    const inviter = (await User.findByPk(member.invitedById!))!;
+    const spy = vi.spyOn(Notification, "create");
+
+    await new InviteReminderTask().perform();
+
+    expect(notifiedFor(spy, member.name)).toBe(1);
+    const call = spy.mock.calls
+      .map(([args]) => args)
+      .find((args) => args?.data?.inviteeName === member.name);
+    expect(call).toMatchObject({
+      event: NotificationEventType.InviteExpired,
+      userId: inviter.id,
+    });
+    spy.mockRestore();
+  });
+
+  it("keeps the expiry notice reachable when the invitee has no inviter", async () => {
+    const guest = await buildInvite({
+      role: UserRole.Guest,
+      inviteLastSentAt: hoursAgo(200),
+      invitedById: null,
+    });
+    // A recipient is still needed, so give the guest an item managed by someone
+    // else; the actor then falls back to the invitee.
+    const manager = await buildAdmin({ teamId: guest.teamId });
+    const collection = await buildCollection({
+      teamId: guest.teamId,
+      createdById: manager.id,
+    });
+    await UserMembership.create({
+      userId: guest.id,
+      collectionId: collection.id,
+      permission: CollectionPermission.Read,
+      createdById: manager.id,
+    });
+    const spy = vi.spyOn(Notification, "create");
+
+    await new InviteReminderTask().perform();
+
+    const call = spy.mock.calls
+      .map(([args]) => args)
+      .find((args) => args?.data?.inviteeName === guest.name);
+    expect(call).toMatchObject({
+      event: NotificationEventType.InviteExpired,
+      actorId: guest.id,
+    });
+    spy.mockRestore();
+  });
 });

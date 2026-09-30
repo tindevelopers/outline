@@ -66,13 +66,7 @@ export async function actorManagesAnyItemOf(
   actorId: string,
   userId: string
 ): Promise<boolean> {
-  const memberships = await UserMembership.findAll({ where: { userId } });
-  const collectionIds = memberships
-    .map((membership) => membership.collectionId)
-    .filter((id): id is string => !!id);
-  const documentIds = memberships
-    .map((membership) => membership.documentId)
-    .filter((id): id is string => !!id);
+  const { collectionIds, documentIds } = await sharedItemIdsFor(userId);
 
   if (!collectionIds.length && !documentIds.length) {
     return false;
@@ -104,13 +98,7 @@ export async function actorManagesAnyItemOf(
  * @returns the manager ids, possibly empty.
  */
 export async function managerIdsFor(userId: string): Promise<string[]> {
-  const memberships = await UserMembership.findAll({ where: { userId } });
-  const collectionIds = memberships
-    .map((membership) => membership.collectionId)
-    .filter((id): id is string => !!id);
-  const documentIds = memberships
-    .map((membership) => membership.documentId)
-    .filter((id): id is string => !!id);
+  const { collectionIds, documentIds } = await sharedItemIdsFor(userId);
 
   if (!collectionIds.length && !documentIds.length) {
     return [];
@@ -131,4 +119,25 @@ export async function managerIdsFor(userId: string): Promise<string[]> {
   });
 
   return [...new Set(managers.map((membership) => membership.userId))];
+}
+
+/**
+ * The ids of every collection and document the given user holds a membership
+ * on.
+ *
+ * @param userId the user's id.
+ * @returns the collection and document ids, possibly empty.
+ */
+async function sharedItemIdsFor(
+  userId: string
+): Promise<{ collectionIds: string[]; documentIds: string[] }> {
+  const memberships = await UserMembership.findAll({ where: { userId } });
+  const collectionIds = memberships
+    .map((membership) => membership.collectionId)
+    .filter((id): id is string => !!id);
+  const documentIds = memberships
+    .map((membership) => membership.documentId)
+    .filter((id): id is string => !!id);
+
+  return { collectionIds, documentIds };
 }
