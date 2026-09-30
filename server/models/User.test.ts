@@ -555,6 +555,8 @@ describe("user model", () => {
       });
       user.incrementFlag(UserFlag.InviteReminderSent, 3);
       user.setFlag(UserFlag.InviteExpiryNotified, true);
+      // Seed a non-zero send count so a reset-to-one regression is caught.
+      user.incrementFlag(UserFlag.InviteSent, 2);
       const sends = user.getFlag(UserFlag.InviteSent);
 
       user.restartInviteLifecycle();
