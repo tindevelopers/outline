@@ -1049,17 +1049,28 @@ import { sequelize } from "@server/storage/database";
 import { TaskPriority } from "./base/BaseTask";
 import { CronTask, TaskInterval } from "./base/CronTask";
 
+/**
+ * The longest invite window. The scan's upper bound is derived from this rather
+ * than hardcoded, because a bound equal to the longest window excludes exactly
+ * the invites that have just expired and silently kills the expiry notice for
+ * every role whose window is the longest.
+ */
+const MaxInviteWindowDays = Math.max(
+  ...Object.values(InviteLifecycle).map(({ windowDays }) => windowDays)
+);
+
 export default class InviteReminderTask extends CronTask {
   public async perform() {
     // An invite younger than two days cannot be due a reminder, since two is
-    // the earliest offset for any role. The 30 day bound matches the longest
-    // window, so expired invites are not re-scanned forever.
+    // the earliest offset for any role. The upper bound sits two days past the
+    // longest window so an invite that expired on the previous daily run is
+    // still scanned and its expiry notice can fire.
     const users = await User.scope("invited").findAll({
       attributes: ["id"],
       where: {
         inviteLastSentAt: {
           [Op.lt]: subDays(new Date(), 2),
-          [Op.gt]: subDays(new Date(), 30),
+          [Op.gt]: subDays(new Date(), MaxInviteWindowDays + 2),
         },
       },
     });
@@ -1225,6 +1236,7 @@ git commit -m "fix: drop the claim that only one reminder is sent"
 - Modify: `server/queues/processors/EmailsProcessor.ts`
 - Modify: `server/queues/tasks/InviteReminderTask.ts`
 - Modify: `server/models/User.ts` (`UserFlag`)
+- Modify: `app/models/Notification.ts` (the `path` case is type-mandatory; `eventText` and `subject` are needed for the row to be legible)
 - Test: `server/queues/tasks/InviteReminderTask.test.ts`
 
 - [ ] **Step 1: Write the failing tests**
@@ -1609,6 +1621,42 @@ Expected: PASS.
 git add shared/types.ts server/models/User.ts server/emails/templates/InviteExpiredEmail.tsx server/queues/processors/EmailsProcessor.ts server/queues/tasks/InviteReminderTask.ts server/queues/tasks/InviteReminderTask.test.ts server/models/helpers/InviteHelper.ts
 git commit -m "feat: notify whoever can act when an invite expires"
 ```
+
+### Implementation notes (as built)
+
+Four corrections were needed beyond the steps above. They are recorded here because each one is a trap a re-implementation would fall into again.
+
+1. **The in-app row was unreadable, which failed the requirement.** The requirement is an in-app notification, not only an email. Without a case, `app/models/Notification.ts` rendered the row as `<actor> emails.invite_expired Unknown` — `eventText`'s `default` returns the raw enum string and `subject` falls through both relation checks to `"Unknown"`, because the notification carries neither a `documentId` nor a `collectionId`. The tempting defence, that `InviteAccepted`, `Onboarding` and `ExportCompleted` fall through the same way, is wrong: none of those three ever creates a `Notification` row (`ExportTask.ts` only sends `ExportSuccessEmail`/`ExportFailureEmail`, `userProvisioner.ts` only sends `InviteAcceptedEmail`, `Onboarding` has no server usage), so their fallthrough is never rendered. `InviteExpired` is the first system event that genuinely has to render in-app. Add both cases:
+
+   ```ts
+   // in eventText
+   case NotificationEventType.InviteExpired:
+     return t("had an invite expire for");
+
+   // in the subject getter, before the documentId check
+   if (this.event === NotificationEventType.InviteExpired) {
+     return this.data.inviteeName ?? "an invitee";
+   }
+   ```
+
+   The row then reads `Jane had an invite expire for Sam Guest`. Note the phrasing matters: `eventText` is rendered as `<actor name> <eventText> <subject>`, so a noun phrase such as `"invite expired for"` produces the ungrammatical `Jane invite expired for Sam Guest`; a verb phrase is required.
+
+2. **`app/models/Notification.ts` also needs a `path` case, and this one is mandatory.** The getter ends with `default: this.event satisfies never`, an exhaustiveness check, so adding a member to `NotificationEventType` fails `tsc` without a case. Return `settingsPath("users")`, matching `InviteAccepted`. Adding the event to the `system` `filterCategories` list is a product judgement rather than a type requirement, but it is the right one.
+
+3. **`InviteExpiredEmail`'s props need `userId`.** The processor passes `userId: notification.userId`, and `EmailProps` does not include it, so the object literal fails on the excess property. Every sibling template in the `Notification` category declares `userId` for this reason. Also drop the plan's `env` import: the template never uses it, and the lint will fail on the dead import.
+
+4. **`actorId` must never be null.** The plan's `actorId: user.invitedById ?? user.id` was there for a reason, and a conditional spread that omits the actor is a silent bug, not a tidy improvement: `EmailsProcessor` loads the notification with the `withActor` scope, which is declared `required: true` (`server/models/Notification.ts`), making it an inner join. A null actor filters the notification out, `findByPk` returns null, and the processor returns early — so the in-app row exists but **no email is ever sent**. Keep the `?? user.id` fallback and say why in a comment.
+
+Two test additions beyond the three steps above, both because the plan's tests were too narrow to catch the defects:
+
+- **A member expiry test.** Every expiry test used a guest, which is exactly why the scan-bound defect below went unnoticed. Add a `UserRole.Member` fixture at `hoursAgo(24 * 31)` and assert the inviter is notified.
+- **A null-inviter test.** Build a guest with `invitedById: null` (the factory's `...overrides` spread accepts it) plus a manager recipient, then assert the created notification carries a non-null `actorId`. Without a manager recipient the fixture produces no notification at all, since the inviter is the other recipient source.
+
+`expiryRecipients` keeps its `Set`, but note in a comment that the `Op.in` query collapses duplicates on its own — otherwise the `Set` reads as the thing enforcing the dedupe contract, and a test that asserts on the observable outcome cannot tell the difference.
+
+The scan bound in Task 4 is the one piece of this plan that was actively wrong. `MaxInviteWindowDays + 1` is off by one in both directions: the strict `Op.gt` excludes a row at exactly `windowDays + 1`, and a member invite expires at exactly `windowDays`. `MaxInviteWindowDays + 2` gives a full day of slack past expiry. Derive it from `InviteLifecycle` rather than hardcoding 30, so changing a window cannot silently reintroduce the hole.
+
+`InviteHelper.ts` ends up with `getGuestInviteItem`, `actorManagesAnyItemOf`, and `managerIdsFor`. The last two duplicate a membership lookup, so extract a private `sharedItemIdsFor(userId)` and have both call it.
 
 ---
 
