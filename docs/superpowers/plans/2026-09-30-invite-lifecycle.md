@@ -651,14 +651,14 @@ import { Op } from "sequelize";
 import { CollectionPermission } from "@shared/types";
 import { Collection, Document, UserMembership } from "@server/models";
 
-export type InviteItem = {
+export interface InviteItem {
   /** Display name of the shared collection or document. */
   itemName: string;
   /** Whether the shared item is a collection rather than a document. */
   isCollection: boolean;
   collectionId?: string;
   documentId?: string;
-};
+}
 
 /**
  * Returns the collection or document a guest was most recently invited to,
@@ -668,7 +668,8 @@ export type InviteItem = {
  * holds a live item.
  *
  * @param userId the guest's id.
- * @returns the item, or null when the guest holds no resolvable membership.
+ * @returns the item, or null when the guest holds no memberships or none of
+ * them resolves to a live collection or document.
  */
 export async function getGuestInviteItem(
   userId: string
@@ -760,14 +761,26 @@ Replace the contents of `server/queues/tasks/InviteReminderTask.test.ts` with:
 
 ```ts
 import { subHours } from "date-fns";
+import type { MockInstance } from "vitest";
 import { CollectionPermission, UserRole } from "@shared/types";
 import InviteReminderEmail from "@server/emails/templates/InviteReminderEmail";
 import GuestInviteReminderEmail from "@server/emails/templates/GuestInviteReminderEmail";
+import { UserFlag } from "@server/models/User";
 import UserMembership from "@server/models/UserMembership";
 import { buildCollection, buildInvite } from "@server/test/factories";
 import InviteReminderTask from "./InviteReminderTask";
 
 const hoursAgo = (hours: number) => subHours(new Date(), hours);
+
+/**
+ * How many emails this spy sent to a specific address. `perform` scans every
+ * invited user in the database, so counting all calls would make these tests
+ * fail against any database holding an unrelated pending invite.
+ */
+const sentTo = (spy: MockInstance, email: string | null) =>
+  spy.mock.contexts.filter(
+    (context: { props: { to?: string | null } }) => context.props.to === email
+  ).length;
 
 /**
  * A guest with an outstanding invite, holding one collection so the reminder
@@ -795,47 +808,47 @@ describe("InviteReminderTask", () => {
     const guest = await buildPendingGuest(50);
 
     await new InviteReminderTask().perform();
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(sentTo(spy, guest.email)).toBe(1);
 
     guest.inviteLastSentAt = hoursAgo(98);
     await guest.save();
     await new InviteReminderTask().perform();
-    expect(spy).toHaveBeenCalledTimes(2);
+    expect(sentTo(spy, guest.email)).toBe(2);
 
     guest.inviteLastSentAt = hoursAgo(146);
     await guest.save();
     await new InviteReminderTask().perform();
-    expect(spy).toHaveBeenCalledTimes(3);
+    expect(sentTo(spy, guest.email)).toBe(3);
 
     // Day seven: the window has closed, so no fourth reminder.
     guest.inviteLastSentAt = hoursAgo(170);
     await guest.save();
     await new InviteReminderTask().perform();
-    expect(spy).toHaveBeenCalledTimes(3);
+    expect(sentTo(spy, guest.email)).toBe(3);
 
     spy.mockRestore();
   });
 
   it("does not remind before the first offset", async () => {
     const spy = vi.spyOn(GuestInviteReminderEmail.prototype, "schedule");
-    await buildPendingGuest(30);
+    const guest = await buildPendingGuest(30);
 
     await new InviteReminderTask().perform();
 
-    expect(spy).not.toHaveBeenCalled();
+    expect(sentTo(spy, guest.email)).toBe(0);
     spy.mockRestore();
   });
 
   it("sends a member reminder on day three", async () => {
     const spy = vi.spyOn(InviteReminderEmail.prototype, "schedule");
-    await buildInvite({
+    const member = await buildInvite({
       role: UserRole.Member,
       inviteLastSentAt: hoursAgo(74),
     });
 
     await new InviteReminderTask().perform();
 
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(sentTo(spy, member.email)).toBe(1);
     spy.mockRestore();
   });
 
@@ -847,18 +860,18 @@ describe("InviteReminderTask", () => {
 
     await new InviteReminderTask().perform();
 
-    expect(spy).not.toHaveBeenCalled();
+    expect(sentTo(spy, guest.email)).toBe(0);
     spy.mockRestore();
   });
 
   it("does not send the same reminder twice on a repeated run", async () => {
     const spy = vi.spyOn(GuestInviteReminderEmail.prototype, "schedule");
-    await buildPendingGuest(50);
+    const guest = await buildPendingGuest(50);
 
     await new InviteReminderTask().perform();
     await new InviteReminderTask().perform();
 
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(sentTo(spy, guest.email)).toBe(1);
     spy.mockRestore();
   });
 
@@ -873,16 +886,20 @@ describe("InviteReminderTask", () => {
     await new InviteReminderTask().perform();
 
     await guest.reload();
-    expect(spy).not.toHaveBeenCalled();
+    expect(sentTo(spy, guest.email)).toBe(0);
     expect(guest.getFlag(UserFlag.InviteReminderSent)).toBe(0);
     spy.mockRestore();
   });
 });
 ```
 
-This test is why `sendReminder` must report whether it sent. Without the guard, `perform` increments `InviteReminderSent` for a guest it never emailed, and after three such runs the guest receives no reminders at all.
+Two things carry the weight here. `sendReminder` must report whether it enqueued: without that guard, `perform` increments `InviteReminderSent` for a guest it never emailed, and after three such runs the guest receives no reminders at all. And every assertion must be scoped to the fixture's own address via `sentTo`, because `perform` scans the whole table.
 
-That file needs `import { UserFlag } from "@server/models/User";`.
+Prove the scoping works before moving on. The shared `outline-test` database holds hundreds of eligible invited rows, so the unscoped form of these assertions fails there while passing on a clean database:
+
+```bash
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/queues/tasks/InviteReminderTask.test.ts
+```
 
 - [ ] **Step 6: Run them to verify they fail**
 
@@ -940,13 +957,9 @@ export default class GuestInviteReminderEmail extends BaseEmail<Props, void> {
   }
 
   protected preview({ isCollection }: Props) {
-    return this.t(
-      "The {{ itemType }} shared with you is still waiting.",
-      {
-        itemType: isCollection ? "collection" : "document",
-        appName: env.APP_NAME,
-      }
-    );
+    return this.t("The {{ itemType }} shared with you is still waiting.", {
+      itemType: isCollection ? "collection" : "document",
+    });
   }
 
   protected renderAsText({
@@ -1038,13 +1051,15 @@ import { CronTask, TaskInterval } from "./base/CronTask";
 
 export default class InviteReminderTask extends CronTask {
   public async perform() {
-    // Two days is the earliest reminder offset for any role, so anything
-    // younger cannot be due a reminder or an expiry notice yet.
+    // An invite younger than two days cannot be due a reminder, since two is
+    // the earliest offset for any role. The 30 day bound matches the longest
+    // window, so expired invites are not re-scanned forever.
     const users = await User.scope("invited").findAll({
       attributes: ["id"],
       where: {
         inviteLastSentAt: {
           [Op.lt]: subDays(new Date(), 2),
+          [Op.gt]: subDays(new Date(), 30),
         },
       },
     });
@@ -1079,6 +1094,9 @@ export default class InviteReminderTask extends CronTask {
           return;
         }
 
+        // At-least-once: the email is enqueued before the flag is saved, so a
+        // failure between the two re-sends on the next run rather than losing
+        // the reminder.
         const didSend = await this.sendReminder(user);
         if (!didSend) {
           return;
@@ -1091,9 +1109,10 @@ export default class InviteReminderTask extends CronTask {
   }
 
   /**
-   * Sends the reminder for this user's role.
+   * Enqueues the reminder for this user's role.
    *
-   * @returns true when an email was sent, false when there is nothing to send.
+   * @returns true when a reminder was enqueued, false when there is nothing to
+   * send.
    */
   private async sendReminder(user: User): Promise<boolean> {
     const invitedBy = user.invitedById
@@ -1210,7 +1229,7 @@ git commit -m "fix: drop the claim that only one reminder is sent"
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `server/queues/tasks/InviteReminderTask.test.ts`:
+Append to `server/queues/tasks/InviteReminderTask.test.ts`. Scope every email assertion through the `sentTo` helper added in Task 4 rather than counting all `schedule` calls:
 
 ```ts
   it("notifies the inviter once when a guest invite expires", async () => {
@@ -1354,8 +1373,7 @@ export default class InviteExpiredEmail extends BaseEmail<Props, void> {
 
   protected preview() {
     return this.t(
-      "You can resend the invitation from the member list if they still need access.",
-      { appName: env.APP_NAME }
+      "You can resend the invitation from the member list if they still need access."
     );
   }
 
