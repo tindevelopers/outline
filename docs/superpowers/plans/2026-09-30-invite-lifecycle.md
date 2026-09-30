@@ -2289,6 +2289,26 @@ git add server/commands/inviteResender.ts server/commands/inviteResender.test.ts
 git commit -m "feat: resend invites with a cooldown, a ceiling, and the right email"
 ```
 
+### Implementation notes (as built)
+
+Six corrections were needed. The first is the one that mattered.
+
+1. **The cooldown was wrong in this plan and in Task 2.** Both said `Hour.ms`; the design spec says 24 hours ("Resend cooldown | 24 hours per invite", and "reject when `now < inviteLastSentAt + 24h`"), and the route's own copy says "try again tomorrow". `shared/constants.ts` now uses `Day.ms`. The plan's cooldown test was also unable to catch it: a **one-hour-old** invite is refused by a one-hour cooldown too, so it proved nothing. It now uses two hours and a new test asserts a **25-hour-old** invite is allowed. That pair genuinely discriminates — with `Hour.ms` restored, the two-hour test fails and the 25-hour test passes.
+
+2. **The plan's test file does not compile.** `hoursAgo` is used but never defined or imported; define it from `subHours` as the sibling test files do.
+
+3. **`createContext({ user })` is the wrong harness.** It leaves `ctx.state.transaction` undefined, which the command needs for `user.save({ transaction })`, and it does not populate the actor's `team`, which the command reads for `teamName` and `teamUrl`. Use `withAPIContext`, which the sibling command tests already use.
+
+4. **A manager could resend to an already-active user.** `can(actor, "resendInvite", user)` requires `user.isInvited`, but `actorManagesAnyItemOf` never inspects the target's invite state, so an actor holding Admin on an item an active user holds passed authorization, consumed that user's cooldown and ceiling budget, and emailed them an invitation. Reachable through the API, since the route takes any user id. Guard the command with `if (!user.isInvited) throw AuthorizationError();`.
+
+5. **The manager branch also dropped the guest exclusion.** `server/policies/collection.ts` gates `inviteGuest` on `!actor.isGuest`, with the comment *"Guests may never invite anyone, otherwise a guest holding manage could grow its own access."* Mirror that guard. Reusing `can(actor, "inviteGuest", item)` is the tidier fix in principle, but `actorManagesAnyItemOf` returns only a boolean and `includesMembership` requires the item preloaded with its memberships, so mirroring is the proportionate change. Do **not** add `isTeamMutable`: it is a stub that returns `true` unconditionally, and gating only this branch on it would make managers stricter than admins for the same action.
+
+6. **Resolve the guest's item before mutating.** The plan re-anchors the clock and signs a token, then throws `ValidationError` when a guest has nothing to name. There is no persistence bug, because the save runs last, but the ordering invites one. Move the `getGuestInviteItem` call and its check above `restartInviteLifecycle()`, then branch the email on whether `item` is non-null.
+
+Three test additions beyond the plan's nine: a manager resending to an active user is refused; a guest managing a shared item is refused; a guest with no resolvable item is refused **and** their clock and send count are unchanged after the rejection, which pins correction 6. Also assert `GuestInviteEmail` is *not* called for a member — spying only `InviteEmail` would let a member receive both emails unnoticed.
+
+One thing to know when writing the guest-actor test: `UserMembership.checkGuestPermissionScope` throws "Guests cannot be granted manage permissions", so the illegal row cannot be created through the normal model path. Creating it with `{ hooks: false }` is what makes the test possible, and is itself evidence the scenario is defense-in-depth rather than an open door.
+
 ---
 
 ## Task 8: Let the item manager see the resend control
