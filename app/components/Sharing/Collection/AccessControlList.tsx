@@ -55,6 +55,7 @@ export const AccessControlList = observer(
     const currentUser = useCurrentUser();
     const { t } = useTranslation();
     const theme = useTheme();
+    const [isResending, setIsResending] = React.useState(false);
     const collectionId = collection.id;
 
     const groupMembershipsInCollection =
@@ -262,25 +263,38 @@ export const AccessControlList = observer(
                       }
                       title={membership.user.name}
                       subtitle={
-                        membership.user.isInvited
-                          ? membership.user.isInviteExpired
-                            ? t("Invite expired")
-                            : t("Invite pending")
-                          : membership.user.email
+                        membership.user.isSuspended
+                          ? t("Suspended")
+                          : membership.user.isInvited
+                            ? membership.user.isInviteExpired
+                              ? t("Invite expired")
+                              : t("Invite pending")
+                            : membership.user.email
                       }
                       actions={
                         <div style={{ marginRight: -8 }}>
-                          {membership.user.isInvited && can.inviteGuest && (
-                            <Button
-                              onClick={() =>
-                                void users.resendInvite(membership.user)
-                              }
-                              neutral
-                              small
-                            >
-                              {t("Resend")}
-                            </Button>
-                          )}
+                          {membership.user.isInvited &&
+                            !membership.user.isSuspended &&
+                            can.inviteGuest && (
+                              <Button
+                                onClick={async () => {
+                                  setIsResending(true);
+                                  try {
+                                    await users.resendInvite(membership.user);
+                                    toast.success(t("Invite resent"));
+                                  } catch (err) {
+                                    toast.error(errToString(err));
+                                  } finally {
+                                    setIsResending(false);
+                                  }
+                                }}
+                                neutral
+                                small
+                                disabled={isResending}
+                              >
+                                {t("Resend")}
+                              </Button>
+                            )}
                           <InputMemberPermissionSelect
                             permissions={permissions}
                             onChange={async (

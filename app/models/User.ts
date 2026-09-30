@@ -142,7 +142,7 @@ class User extends ParanoidModel implements Searchable {
     return (
       this.isInvited &&
       !!this.inviteExpiresAt &&
-      new Date(this.inviteExpiresAt) < new Date()
+      new Date(this.inviteExpiresAt) < new Date(now(60000))
     );
   }
 

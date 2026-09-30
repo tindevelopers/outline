@@ -1,5 +1,5 @@
 import { observer } from "mobx-react";
-import { useCallback, Fragment } from "react";
+import { useCallback, useState, Fragment } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import styled from "styled-components";
@@ -22,7 +22,7 @@ type Props = {
   onRemove?: () => void;
   onLeave?: () => void;
   onUpdate?: (permission: DocumentPermission) => void;
-  onResend?: () => void;
+  onResend?: () => Promise<void>;
 };
 
 const DocumentMemberListItem = ({
@@ -34,6 +34,7 @@ const DocumentMemberListItem = ({
   onResend,
 }: Props) => {
   const { t } = useTranslation();
+  const [isResending, setIsResending] = useState(false);
 
   const handleChange = useCallback(
     (permission: DocumentPermission | typeof EmptySelectValue) => {
@@ -113,7 +114,19 @@ const DocumentMemberListItem = ({
       actions={
         <div style={{ marginRight: -8 }}>
           {onResend && (
-            <Button onClick={onResend} neutral small>
+            <Button
+              onClick={async () => {
+                setIsResending(true);
+                try {
+                  await onResend();
+                } finally {
+                  setIsResending(false);
+                }
+              }}
+              neutral
+              small
+              disabled={isResending}
+            >
               {t("Resend")}
             </Button>
           )}

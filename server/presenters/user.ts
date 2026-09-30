@@ -22,7 +22,7 @@ type UserPresentation = {
   deletedAt: Date | null;
   lastActiveAt: Date | null;
   /** When the outstanding invitation stops working, or null. */
-  inviteExpiresAt?: Date | null;
+  inviteExpiresAt: Date | null;
   color: string;
   role: UserRole;
   isSuspended: boolean;
