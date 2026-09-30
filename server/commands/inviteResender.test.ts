@@ -3,7 +3,7 @@ import { InviteMaxSends } from "@shared/constants";
 import { CollectionPermission, UserRole } from "@shared/types";
 import GuestInviteEmail from "@server/emails/templates/GuestInviteEmail";
 import InviteEmail from "@server/emails/templates/InviteEmail";
-import { User, UserMembership } from "@server/models";
+import { UserMembership } from "@server/models";
 import { UserFlag } from "@server/models/User";
 import {
   buildAdmin,
@@ -140,6 +140,32 @@ describe("inviteResender", () => {
 
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
+  });
+
+  it("refuses a manager resending to an already active user", async () => {
+    // buildUser sets lastActiveAt, so the target has already signed in.
+    const target = await buildUser();
+    const manager = await buildUser({ teamId: target.teamId });
+    const collection = await buildCollection({
+      teamId: target.teamId,
+      createdById: manager.id,
+    });
+    await UserMembership.create({
+      userId: target.id,
+      collectionId: collection.id,
+      permission: CollectionPermission.Read,
+      createdById: manager.id,
+    });
+    await UserMembership.create({
+      userId: manager.id,
+      collectionId: collection.id,
+      permission: CollectionPermission.Admin,
+      createdById: manager.id,
+    });
+
+    await expect(
+      withAPIContext(manager, (ctx) => inviteResender(ctx, { user: target }))
+    ).rejects.toThrow(/Authorization/);
   });
 
   it("refuses an unrelated member", async () => {

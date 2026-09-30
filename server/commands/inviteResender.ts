@@ -25,7 +25,7 @@ type Props = {
  *
  * @param ctx The request context, carrying the actor and the transaction.
  * @param props.user The invited user to resend to.
- * @throws AuthorizationError when the actor may neither administer the team nor manage a shared item.
+ * @throws AuthorizationError when the target has no outstanding invite, or the actor may neither administer the team nor manage a shared item.
  * @throws ValidationError when the cooldown has not elapsed, the send ceiling is reached, or a guest holds nothing.
  */
 export default async function inviteResender(
@@ -34,6 +34,13 @@ export default async function inviteResender(
 ): Promise<void> {
   const { user: actor } = ctx.state.auth;
   const { transaction } = ctx.state;
+
+  // The admin policy already requires a pending invite; the manager branch
+  // below only inspects shared items, so without this an active user could be
+  // re-invited through an item they merely hold access to.
+  if (!user.isInvited) {
+    throw AuthorizationError();
+  }
 
   const isAdmin = can(actor, "resendInvite", user);
   if (!isAdmin && !(await actorManagesAnyItemOf(actor.id, user.id))) {
