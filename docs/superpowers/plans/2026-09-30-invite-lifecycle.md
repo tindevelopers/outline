@@ -1890,6 +1890,21 @@ git add server/models/User.ts server/commands/guestInviter.ts server/routes/api/
 git commit -m "fix: start or restart the invite clock on every invite path"
 ```
 
+### Implementation notes (as built)
+
+Three corrections were needed.
+
+1. **The second `guestInviter` test does not compile as written.** It passes `email: member.email`, but `GuestInvite.email` is `string` while `User.email` is `string | null`. Give the member an explicit literal (`const email = "active-member@example.com"`) and pass that.
+2. **`ops.ts`'s new fields need a test.** `ops.test.ts` never posted an `adminEmail`, so the whole of gap 2 was uncovered and a regression would have been silent. Add a case posting the existing subdomain body extended with `adminEmail`, then load the provisioned admin from the database using the created team's id from the response and assert a non-null `inviteLastSentAt`, `invitedById === platformAdmin.id`, and `getFlag(UserFlag.InviteSent) === 1`. Confirm the assertion is real by reverting the three fields and watching it fail.
+3. **Seed a non-zero `InviteSent` in the model test.** `buildInvite` leaves the flag unset, so `sends + 1` is effectively `toBe(1)` and a regression that *sets* the counter to 1 instead of incrementing it would still pass. Increment by 2 before capturing `sends`.
+
+Two things deliberately left alone, both out of scope:
+
+- `guestInviter.ts:81-82` comments that an existing non-invited active member receives only a membership, while `:131-141` schedules `GuestInviteEmail` unconditionally. That contradiction predates this task — it shipped with the guest-sharing feature — and is not this plan's to fix.
+- The ops actor is named as `invitedById` even though they are not a member of the new team. The expiry notification therefore carries the new team's `teamId` and will not surface in that actor's own team-scoped notification list, while the email still arrives. Naming a real person is what the reminder email needs, so this stands; if symmetry is ever wanted, the fix belongs in `expiryRecipients`, not in `ops.ts`.
+
+`users.resendInvite` still does not re-anchor the clock. That is Task 7's, and the design spec assigns it there explicitly — do not close it here.
+
 ---
 
 ## Task 7: Resend with a cooldown, a ceiling, and the right email
