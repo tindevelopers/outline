@@ -1487,16 +1487,21 @@ git commit -m "feat: notify whoever can act when an invite expires"
 
 ---
 
-## Task 6b: Restart the lifecycle when an existing guest is invited again
+## Task 6b: Close the remaining invite-clock gaps
 
-The spec's edge case "the clock is per person, not per grant" says inviting a guest who already holds an item to a second item restarts their window and reminder count. `guestInviter` only sets the clock on the create path, so a reused guest keeps the old clock. Without this, a guest invited to a second item the day before their first window closes receives an expiry notice for an invite they were just sent.
+Two defects found in review, both the same class: a path that sends an invite but never starts or restarts the clock.
+
+**Gap 1 — re-inviting an existing guest.** The spec's edge case "the clock is per person, not per grant" says inviting a guest who already holds an item to a second item restarts their window and reminder count. `guestInviter` only sets the clock on the create path, so a reused guest keeps the old clock. Without this, a guest invited to a second item the day before their first window closes receives an expiry notice for an invite they were just sent.
+
+**Gap 2 — ops team provisioning.** `ops.teams.create` creates an admin and immediately sends an `InviteEmail`, but never sets `inviteLastSentAt`, `invitedById`, or the `InviteSent` flag. That invite therefore never reminds and never expires. The token is still bounded, because `getInviteToken()` falls back to the full window for a null clock, so the blast radius is "silently no lifecycle" rather than "link never dies".
 
 This task comes after Task 6 because the helper it adds touches `UserFlag.InviteExpiryNotified`, which Task 6 defines.
 
 **Files:**
 - Modify: `server/models/User.ts`
 - Modify: `server/commands/guestInviter.ts`
-- Test: `server/models/User.test.ts`, `server/commands/guestInviter.test.ts`
+- Modify: `server/routes/api/ops/ops.ts`
+- Test: `server/models/User.test.ts`, `server/commands/guestInviter.test.ts`, `server/commands/userInviter.test.ts`
 
 - [ ] **Step 1: Write the failing model test**
 
@@ -1524,7 +1529,7 @@ Append to the `describe("invite lifecycle")` block in `server/models/User.test.t
 
 Add `import { UserFlag } from "./User";` if the file does not already import it.
 
-- [ ] **Step 2: Write the failing command test**
+- [ ] **Step 2: Write the failing command tests**
 
 Append to `server/commands/guestInviter.test.ts`, following that file's existing `withAPIContext` pattern:
 
@@ -1599,6 +1604,23 @@ Append to `server/commands/guestInviter.test.ts`, following that file's existing
 
 Add `subDays` from `date-fns` and `UserFlag` from `@server/models/User` to that file's imports if absent.
 
+Then strengthen the existing "starts the invite clock" test in `server/commands/userInviter.test.ts` so it verifies the clock is roughly now, not merely a Date. Replace its final assertion:
+
+```ts
+    expect(users[0].inviteLastSentAt).toBeInstanceOf(Date);
+```
+
+with:
+
+```ts
+    expect(users[0].inviteLastSentAt).toBeInstanceOf(Date);
+    expect(users[0].getInviteExpiresAt()?.getTime()).toBeGreaterThan(
+      Date.now()
+    );
+```
+
+Without this, a stale clock (for example the factory's 2018 default) would pass the test.
+
 - [ ] **Step 3: Run the tests to verify they fail**
 
 ```bash
@@ -1624,7 +1646,7 @@ In `server/models/User.ts`, next to the other invite helpers:
   };
 ```
 
-- [ ] **Step 5: Call it from the reuse path**
+- [ ] **Step 5: Call it from the guest reuse path**
 
 In `server/commands/guestInviter.ts`, the existing-user branch currently does nothing. Replace the create-only `if` with:
 
@@ -1653,21 +1675,46 @@ In `server/commands/guestInviter.ts`, the existing-user branch currently does no
   }
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [ ] **Step 6: Start the clock in ops team provisioning**
+
+In `server/routes/api/ops/ops.ts`, the `User.createWithCtx` call for the first admin currently passes `role` and `isViewer` only, yet the handler then sends an `InviteEmail`. Give that invite the same fields `userInviter` sets, so the lifecycle applies:
+
+```ts
+      const adminUser = await User.createWithCtx(
+        ctx,
+        {
+          teamId: team.id,
+          name: adminEmail.split("@")[0],
+          email: adminEmail.toLowerCase(),
+          role: UserRole.Admin,
+          isViewer: false,
+          invitedById: user.id,
+          inviteLastSentAt: new Date(),
+          flags: {
+            [UserFlag.InviteSent]: 1,
+          },
+        },
+        undefined
+      );
+```
+
+`invitedById` matters beyond tidiness: the reminder email names the inviter, and the expiry notice uses `invitedById` as a recipient. Add the `UserFlag` import from `@server/models/User` if the file does not already have it.
+
+- [ ] **Step 7: Run the tests to verify they pass**
 
 ```bash
-NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/models/User.test.ts server/commands/guestInviter.test.ts server/routes/api/users/users.test.ts
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/models/User.test.ts server/commands/guestInviter.test.ts server/commands/userInviter.test.ts server/routes/api/users/users.test.ts server/routes/api/ops/ops.test.ts
 ```
-Expected: PASS.
+Expected: PASS. If `server/routes/api/ops/ops.test.ts` does not exist, say so in the report and run the rest.
 
-- [ ] **Step 7: Static checks and commit**
+- [ ] **Step 8: Static checks and commit**
 
 ```bash
 ./node_modules/.bin/tsc --noEmit
-./node_modules/.bin/oxfmt --check server/models/User.ts server/commands/guestInviter.ts server/models/User.test.ts server/commands/guestInviter.test.ts
-./node_modules/.bin/oxlint --type-aware server/models/User.ts server/commands/guestInviter.ts
-git add server/models/User.ts server/commands/guestInviter.ts server/models/User.test.ts server/commands/guestInviter.test.ts
-git commit -m "feat: restart a guest's invite lifecycle when they are invited again"
+./node_modules/.bin/oxfmt --check server/models/User.ts server/commands/guestInviter.ts server/routes/api/ops/ops.ts server/models/User.test.ts server/commands/guestInviter.test.ts server/commands/userInviter.test.ts
+./node_modules/.bin/oxlint --type-aware server/models/User.ts server/commands server/routes/api/ops
+git add server/models/User.ts server/commands/guestInviter.ts server/routes/api/ops/ops.ts server/models/User.test.ts server/commands/guestInviter.test.ts server/commands/userInviter.test.ts
+git commit -m "fix: start or restart the invite clock on every invite path"
 ```
 
 ---
