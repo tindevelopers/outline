@@ -52,11 +52,14 @@ describe("inviteResender", () => {
     });
     const admin = await buildAdmin({ teamId: member.teamId });
     const spy = vi.spyOn(InviteEmail.prototype, "schedule");
+    const guestSpy = vi.spyOn(GuestInviteEmail.prototype, "schedule");
 
     await withAPIContext(admin, (ctx) => inviteResender(ctx, { user: member }));
 
     expect(spy).toHaveBeenCalledTimes(1);
+    expect(guestSpy).not.toHaveBeenCalled();
     spy.mockRestore();
+    guestSpy.mockRestore();
   });
 
   it("refuses a second resend inside the cooldown", async () => {
@@ -168,6 +171,38 @@ describe("inviteResender", () => {
     ).rejects.toThrow(/Authorization/);
   });
 
+  it("refuses a guest who manages a shared item", async () => {
+    const guest = await buildPendingGuest(200);
+    // buildUser loads the team, so the actor is a fully-formed guest rather
+    // than one that crashes later on a missing association.
+    const other = await buildUser({
+      teamId: guest.teamId,
+      role: UserRole.Guest,
+    });
+    const collection = await buildCollection({ teamId: guest.teamId });
+    await UserMembership.create({
+      userId: guest.id,
+      collectionId: collection.id,
+      permission: CollectionPermission.Read,
+      createdById: other.id,
+    });
+    // The model hook forbids granting manage to a guest, so bypass it to model
+    // the defense-in-depth row the command's guard must refuse.
+    await UserMembership.create(
+      {
+        userId: other.id,
+        collectionId: collection.id,
+        permission: CollectionPermission.Admin,
+        createdById: other.id,
+      },
+      { hooks: false }
+    );
+
+    await expect(
+      withAPIContext(other, (ctx) => inviteResender(ctx, { user: guest }))
+    ).rejects.toThrow(/Authorization/);
+  });
+
   it("refuses an unrelated member", async () => {
     const guest = await buildPendingGuest(200);
     const stranger = await buildViewer({ teamId: guest.teamId });
@@ -191,6 +226,29 @@ describe("inviteResender", () => {
     await expect(
       withAPIContext(other, (ctx) => inviteResender(ctx, { user: guest }))
     ).rejects.toThrow(/Authorization/);
+  });
+
+  it("refuses a guest with nothing left to name without mutating the invite", async () => {
+    const guest = await buildInvite({
+      role: UserRole.Guest,
+      inviteLastSentAt: hoursAgo(200),
+    });
+    const admin = await buildAdmin({ teamId: guest.teamId });
+    const beforeSentAt = guest.inviteLastSentAt?.getTime();
+    const beforeSent = guest.getFlag(UserFlag.InviteSent);
+
+    await expect(
+      withAPIContext(admin, (ctx) => inviteResender(ctx, { user: guest }))
+    ).rejects.toThrow(/no longer has access/);
+
+    // The item is resolved before any mutation, so nothing changed even in
+    // memory.
+    expect(guest.inviteLastSentAt?.getTime()).toBe(beforeSentAt);
+    expect(guest.getFlag(UserFlag.InviteSent)).toBe(beforeSent);
+
+    await guest.reload();
+    expect(guest.inviteLastSentAt?.getTime()).toBe(beforeSentAt);
+    expect(guest.getFlag(UserFlag.InviteSent)).toBe(beforeSent);
   });
 
   it("counts the resend against the send total", async () => {

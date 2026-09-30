@@ -43,7 +43,15 @@ export default async function inviteResender(
   }
 
   const isAdmin = can(actor, "resendInvite", user);
-  if (!isAdmin && !(await actorManagesAnyItemOf(actor.id, user.id))) {
+
+  // Mirror the guest exclusion in the collection policy's `inviteGuest`
+  // ability: a guest holding manage on a shared item must not be able to grow
+  // its own access by re-inviting. The admin path already excludes guests,
+  // since `isTeamAdmin` requires a staff admin.
+  const managesItem =
+    !actor.isGuest && (await actorManagesAnyItemOf(actor.id, user.id));
+
+  if (!isAdmin && !managesItem) {
     throw AuthorizationError();
   }
 
@@ -58,17 +66,21 @@ export default async function inviteResender(
     throw ValidationError("This invite has been sent too many times");
   }
 
+  // Resolve the guest's item before mutating anything, so a guest with nothing
+  // to name fails without consuming a send or reopening the window.
+  const item =
+    user.role === UserRole.Guest ? await getGuestInviteItem(user.id) : null;
+
+  if (user.role === UserRole.Guest && !item) {
+    throw ValidationError("This guest no longer has access to anything");
+  }
+
   // Re-anchor before signing, otherwise the new token would inherit the
   // expired window it is replacing.
   user.restartInviteLifecycle();
   const token = user.getInviteToken();
 
-  if (user.role === UserRole.Guest) {
-    const item = await getGuestInviteItem(user.id);
-    if (!item) {
-      throw ValidationError("This guest no longer has access to anything");
-    }
-
+  if (item) {
     await new GuestInviteEmail({
       to: user.email,
       language: user.language,
