@@ -30,7 +30,7 @@ import {
   AfterUpdate,
   BeforeUpdate,
 } from "sequelize-typescript";
-import { UserPreferenceDefaults } from "@shared/constants";
+import { InviteLifecycle, UserPreferenceDefaults } from "@shared/constants";
 import { languages } from "@shared/i18n";
 import type {
   NotificationSettings,
@@ -47,6 +47,7 @@ import {
 import { UserRoleHelper } from "@shared/utils/UserRoleHelper";
 import { stringToColor } from "@shared/utils/color";
 import type { locales } from "@shared/utils/date";
+import { Day } from "@shared/utils/time";
 import { UserValidation } from "@shared/validations";
 import env from "@server/env";
 import DeleteAttachmentTask from "@server/queues/tasks/DeleteAttachmentTask";
@@ -706,22 +707,61 @@ class User extends ParanoidModel<
     );
 
   /**
-   * Returns a long-lived token that accepts an email invitation with a single
-   * click. Unlike the email signin token it is not IP-bound, and it is only
-   * honored while the invite has not yet been accepted.
+   * Days an invitation stays live for this user's role.
+   *
+   * @returns the window length in days.
+   */
+  getInviteWindowDays = (): number =>
+    // InviteLifecycle covers every role, so this only guards a row whose role
+    // predates the enum.
+    InviteLifecycle[this.role]?.windowDays ?? 30;
+
+  /**
+   * The moment this user's invitation link stops working.
+   *
+   * @returns the expiry, or null when no invite has been sent.
+   */
+  getInviteExpiresAt = (): Date | null =>
+    this.inviteLastSentAt
+      ? new Date(
+          this.inviteLastSentAt.getTime() + this.getInviteWindowDays() * Day.ms
+        )
+      : null;
+
+  /**
+   * Whether the invitation has outlived its window without being accepted.
+   *
+   * @returns true when the invite is expired.
+   */
+  isInviteExpired = (): boolean => {
+    const expiresAt = this.getInviteExpiresAt();
+    return !!expiresAt && this.isInvited && expiresAt.getTime() < Date.now();
+  };
+
+  /**
+   * Returns a token that accepts an email invitation with a single click.
+   * Unlike the email signin token it is not IP-bound, and it is only honored
+   * while the invite has not yet been accepted. Its lifetime matches the
+   * invite window, so a reminder can never outlive the invite it belongs to.
    *
    * @returns The invite acceptance token
    */
-  getInviteToken = () =>
-    JWT.sign(
+  getInviteToken = () => {
+    const expiresAt = this.getInviteExpiresAt();
+    const expiresIn = expiresAt
+      ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
+      : Day.seconds * this.getInviteWindowDays();
+
+    return JWT.sign(
       {
         id: this.id,
         createdAt: new Date().toISOString(),
         type: "invite-accept",
       },
       this.jwtSecret,
-      { expiresIn: "30d" }
+      { expiresIn }
     );
+  };
 
   /**
    * Generate a 6-digit verification code for email authentication
