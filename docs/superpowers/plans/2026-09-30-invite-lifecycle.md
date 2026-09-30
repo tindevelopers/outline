@@ -328,6 +328,8 @@ Replace the existing `getInviteToken` with:
    * @returns the window length in days.
    */
   getInviteWindowDays = (): number =>
+    // InviteLifecycle covers every role, so this only guards a row whose role
+    // predates the enum.
     InviteLifecycle[this.role]?.windowDays ?? 30;
 
   /**
@@ -364,7 +366,7 @@ Replace the existing `getInviteToken` with:
     const expiresAt = this.getInviteExpiresAt();
     const expiresIn = expiresAt
       ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
-      : Day.seconds * 30;
+      : Day.seconds * this.getInviteWindowDays();
 
     return JWT.sign(
       {
