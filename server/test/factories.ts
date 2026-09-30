@@ -258,6 +258,8 @@ export async function buildInvite(overrides: Partial<User> = {}) {
     email: faker.internet.email().toLowerCase(),
     name: faker.person.fullName(),
     createdAt: new Date("2018-01-01T00:00:00.000Z"),
+    inviteLastSentAt:
+      overrides.createdAt ?? new Date("2018-01-01T00:00:00.000Z"),
     invitedById: actor.id,
     authentications: [],
     ...overrides,

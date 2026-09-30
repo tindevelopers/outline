@@ -94,6 +94,7 @@ export default async function guestInviter(
         email,
         role: UserRole.Guest,
         invitedById: actor.id,
+        inviteLastSentAt: new Date(),
         flags: {
           [UserFlag.InviteSent]: 1,
         },

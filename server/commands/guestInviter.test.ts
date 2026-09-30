@@ -239,4 +239,26 @@ describe("guestInviter", () => {
     expect(membership.documentId).toEqual(document.id);
     expect(membership.collectionId).toBeNull();
   });
+
+  it("starts the invite clock", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      createdById: admin.id,
+    });
+
+    const { user } = await withAPIContext(admin, (ctx) =>
+      guestInviter(ctx, {
+        invite: {
+          email: "clock@example.com",
+          collectionId: collection.id,
+          permission: CollectionPermission.Read,
+        },
+      })
+    );
+
+    expect(user.inviteLastSentAt).toBeInstanceOf(Date);
+    expect(user.getInviteExpiresAt()?.getTime()).toBeGreaterThan(Date.now());
+  });
 });

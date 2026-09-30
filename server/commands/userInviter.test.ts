@@ -1,6 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { UserRole } from "@shared/types";
-import { buildTeam, buildUser } from "@server/test/factories";
+import { buildAdmin, buildTeam, buildUser } from "@server/test/factories";
 import userInviter from "./userInviter";
 import { withAPIContext } from "@server/test/support";
 import { TeamDomain } from "@server/models";
@@ -142,5 +142,40 @@ describe("userInviter", () => {
       })
     );
     expect(response.sent.length).toEqual(0);
+  });
+
+  it("starts the invite clock", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+
+    const { users } = await withAPIContext(admin, (ctx) =>
+      userInviter(ctx, {
+        invites: [
+          { email: "clock@example.com", name: "Clock", role: UserRole.Member },
+        ],
+      })
+    );
+
+    expect(users[0].inviteLastSentAt).toBeInstanceOf(Date);
+  });
+
+  it("leaves the clock unset when the email is suppressed", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+
+    const { users } = await withAPIContext(admin, (ctx) =>
+      userInviter(ctx, {
+        invites: [
+          {
+            email: "silent@example.com",
+            name: "Silent",
+            role: UserRole.Member,
+          },
+        ],
+        suppressEmail: true,
+      })
+    );
+
+    expect(users[0].inviteLastSentAt).toBeNull();
   });
 });
