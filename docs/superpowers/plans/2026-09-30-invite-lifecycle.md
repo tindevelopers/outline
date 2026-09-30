@@ -602,6 +602,35 @@ describe("getGuestInviteItem", () => {
 
     expect(await getGuestInviteItem(guest.id)).toBeNull();
   });
+
+  it("falls back past a membership whose item is gone", async () => {
+    const guest = await buildGuest();
+    const document = await buildDocument({ teamId: guest.teamId });
+    await UserMembership.create({
+      userId: guest.id,
+      documentId: document.id,
+      permission: DocumentPermission.Read,
+      createdById: guest.invitedById!,
+    });
+
+    // A newer membership whose collection has been deleted. The foreign key is
+    // ON DELETE SET NULL, so the row survives with a null collectionId.
+    const stale = await UserMembership.create({
+      userId: guest.id,
+      collectionId: (await buildCollection({ teamId: guest.teamId })).id,
+      permission: CollectionPermission.Read,
+      createdById: guest.invitedById!,
+    });
+    await stale.update({ collectionId: null });
+
+    const item = await getGuestInviteItem(guest.id);
+
+    expect(item).toEqual({
+      itemName: document.title,
+      isCollection: false,
+      documentId: document.id,
+    });
+  });
 });
 ```
 
@@ -632,42 +661,44 @@ export type InviteItem = {
 };
 
 /**
- * Returns the collection or document a guest was most recently invited to.
+ * Returns the collection or document a guest was most recently invited to,
+ * skipping memberships whose item no longer exists. A deleted collection or
+ * document leaves its membership row behind with a null foreign key, so
+ * stopping at the newest row would lose the reminder even when the guest still
+ * holds a live item.
  *
  * @param userId the guest's id.
- * @returns the item, or null when the guest holds no memberships.
+ * @returns the item, or null when the guest holds no resolvable membership.
  */
 export async function getGuestInviteItem(
   userId: string
 ): Promise<InviteItem | null> {
-  const membership = await UserMembership.findOne({
+  const memberships = await UserMembership.findAll({
     where: { userId },
     order: [["createdAt", "DESC"]],
   });
 
-  if (!membership) {
-    return null;
-  }
-
-  if (membership.collectionId) {
-    const collection = await Collection.findByPk(membership.collectionId);
-    if (collection) {
-      return {
-        itemName: collection.name,
-        isCollection: true,
-        collectionId: collection.id,
-      };
+  for (const membership of memberships) {
+    if (membership.collectionId) {
+      const collection = await Collection.findByPk(membership.collectionId);
+      if (collection) {
+        return {
+          itemName: collection.name,
+          isCollection: true,
+          collectionId: collection.id,
+        };
+      }
     }
-  }
 
-  if (membership.documentId) {
-    const document = await Document.findByPk(membership.documentId);
-    if (document) {
-      return {
-        itemName: document.title,
-        isCollection: false,
-        documentId: document.id,
-      };
+    if (membership.documentId) {
+      const document = await Document.findByPk(membership.documentId);
+      if (document) {
+        return {
+          itemName: document.title,
+          isCollection: false,
+          documentId: document.id,
+        };
+      }
     }
   }
 
@@ -830,8 +861,28 @@ describe("InviteReminderTask", () => {
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });
+
+  it("does not burn a reminder slot when there is nothing to name", async () => {
+    const spy = vi.spyOn(GuestInviteReminderEmail.prototype, "schedule");
+    // A pending guest who holds no item at all.
+    const guest = await buildInvite({
+      role: UserRole.Guest,
+      inviteLastSentAt: hoursAgo(50),
+    });
+
+    await new InviteReminderTask().perform();
+
+    await guest.reload();
+    expect(spy).not.toHaveBeenCalled();
+    expect(guest.getFlag(UserFlag.InviteReminderSent)).toBe(0);
+    spy.mockRestore();
+  });
 });
 ```
+
+This test is why `sendReminder` must report whether it sent. Without the guard, `perform` increments `InviteReminderSent` for a guest it never emailed, and after three such runs the guest receives no reminders at all.
+
+That file needs `import { UserFlag } from "@server/models/User";`.
 
 - [ ] **Step 6: Run them to verify they fail**
 
@@ -1013,7 +1064,7 @@ export default class InviteReminderTask extends CronTask {
           return;
         }
 
-        const schedule = InviteLifecycle[user.role].reminderDays;
+        const schedule = InviteLifecycle[user.role]?.reminderDays ?? [];
         const sent = user.getFlag(UserFlag.InviteReminderSent);
         const dueOnDay = schedule[sent];
 
