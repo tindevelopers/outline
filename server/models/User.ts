@@ -740,6 +740,18 @@ class User extends ParanoidModel<
   };
 
   /**
+   * Restarts the invitation lifecycle: reopens the window, resets the reminder
+   * count, and re-arms the expiry notice. The send count is not reset, since it
+   * is an abuse backstop rather than a per-window allowance.
+   */
+  restartInviteLifecycle = () => {
+    this.inviteLastSentAt = new Date();
+    this.setFlag(UserFlag.InviteReminderSent, false);
+    this.setFlag(UserFlag.InviteExpiryNotified, false);
+    this.incrementFlag(UserFlag.InviteSent);
+  };
+
+  /**
    * Returns a token that accepts an email invitation with a single click.
    * Unlike the email signin token it is not IP-bound, and it is only honored
    * while the invite has not yet been accepted. Its lifetime matches the

@@ -14,7 +14,7 @@ import {
   buildGuestUser,
   buildInvite,
 } from "@server/test/factories";
-import User from "./User";
+import User, { UserFlag } from "./User";
 import UserMembership from "./UserMembership";
 
 beforeAll(() => {
@@ -546,6 +546,26 @@ describe("user model", () => {
       const expiresAt = new Date((payload.exp as number) * 1000);
 
       expect(expiresAt.toISOString()).toBe("2018-02-01T00:00:00.000Z");
+    });
+
+    it("restarts the lifecycle, keeping the send count", async () => {
+      const user = await buildInvite({
+        role: UserRole.Guest,
+        inviteLastSentAt: new Date("2018-01-01T00:00:00.000Z"),
+      });
+      user.incrementFlag(UserFlag.InviteReminderSent, 3);
+      user.setFlag(UserFlag.InviteExpiryNotified, true);
+      const sends = user.getFlag(UserFlag.InviteSent);
+
+      user.restartInviteLifecycle();
+
+      // The suite pins the clock to 2018-01-02.
+      expect(user.inviteLastSentAt).toEqual(
+        new Date("2018-01-02T00:00:00.000Z")
+      );
+      expect(user.getFlag(UserFlag.InviteReminderSent)).toBe(0);
+      expect(user.getFlag(UserFlag.InviteExpiryNotified)).toBe(0);
+      expect(user.getFlag(UserFlag.InviteSent)).toBe(sends + 1);
     });
   });
 });

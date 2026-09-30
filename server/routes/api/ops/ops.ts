@@ -101,6 +101,11 @@ router.post(
           email: adminEmail.toLowerCase(),
           role: UserRole.Admin,
           isViewer: false,
+          invitedById: user.id,
+          inviteLastSentAt: new Date(),
+          flags: {
+            [UserFlag.InviteSent]: 1,
+          },
         },
         undefined
       );

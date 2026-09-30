@@ -157,6 +157,9 @@ describe("userInviter", () => {
     );
 
     expect(users[0].inviteLastSentAt).toBeInstanceOf(Date);
+    expect(users[0].getInviteExpiresAt()?.getTime()).toBeGreaterThan(
+      Date.now()
+    );
   });
 
   it("leaves the clock unset when the email is suppressed", async () => {

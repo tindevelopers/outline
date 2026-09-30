@@ -101,6 +101,11 @@ export default async function guestInviter(
       },
       { name: "invite_guest" }
     );
+  } else if (target.isInvited) {
+    // The guest is being emailed again, so their lifecycle restarts. An
+    // existing active member is not invited and has no clock to restart.
+    target.restartInviteLifecycle();
+    await target.saveWithCtx(ctx);
   }
 
   const where = collection
