@@ -61,6 +61,7 @@ class Notification extends Model {
       ],
       system: [
         NotificationEventType.InviteAccepted,
+        NotificationEventType.InviteExpired,
         NotificationEventType.Onboarding,
         NotificationEventType.Features,
         NotificationEventType.ExportCompleted,
@@ -213,6 +214,8 @@ class Notification extends Model {
         return t("shared");
       case NotificationEventType.AddUserToCollection:
         return t("invited you to");
+      case NotificationEventType.InviteExpired:
+        return t("had an invite expire for");
       case NotificationEventType.RequestDocumentAccess:
         if (this.accessRequestStatus === "approved") {
           return t("was granted access to");
@@ -233,6 +236,9 @@ class Notification extends Model {
    * @returns The subject
    */
   get subject() {
+    if (this.event === NotificationEventType.InviteExpired) {
+      return this.data.inviteeName ?? "an invitee";
+    }
     if (this.documentId) {
       return this.document?.title ?? "a document";
     }
@@ -279,6 +285,9 @@ class Notification extends Model {
           : this.document?.path;
       }
       case NotificationEventType.InviteAccepted: {
+        return settingsPath("users");
+      }
+      case NotificationEventType.InviteExpired: {
         return settingsPath("users");
       }
       case NotificationEventType.Onboarding:

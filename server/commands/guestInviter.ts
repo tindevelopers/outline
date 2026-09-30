@@ -94,12 +94,18 @@ export default async function guestInviter(
         email,
         role: UserRole.Guest,
         invitedById: actor.id,
+        inviteLastSentAt: new Date(),
         flags: {
           [UserFlag.InviteSent]: 1,
         },
       },
       { name: "invite_guest" }
     );
+  } else if (target.isInvited) {
+    // The guest is being emailed again, so their lifecycle restarts. An
+    // existing active member is not invited and has no clock to restart.
+    target.restartInviteLifecycle();
+    await target.saveWithCtx(ctx);
   }
 
   const where = collection

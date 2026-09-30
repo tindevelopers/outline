@@ -194,4 +194,80 @@ describe("User model", () => {
       expect(user.initials).toBe("JG");
     });
   });
+
+  describe("isInviteExpired", () => {
+    test("should be true when the invite expiry is in the past", () => {
+      const user = new User(
+        {
+          id: "301",
+          name: "Guest",
+          inviteExpiresAt: new Date(Date.now() - 86400000).toISOString(),
+        },
+        users
+      );
+      expect(user.isInviteExpired).toBe(true);
+    });
+
+    test("should be false when the invite expiry is in the future", () => {
+      const user = new User(
+        {
+          id: "302",
+          name: "Guest",
+          inviteExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        },
+        users
+      );
+      expect(user.isInviteExpired).toBe(false);
+    });
+
+    test("should be false when the invite expiry is null", () => {
+      const user = new User(
+        {
+          id: "303",
+          name: "Guest",
+          inviteExpiresAt: null,
+        },
+        users
+      );
+      expect(user.isInviteExpired).toBe(false);
+    });
+
+    test("should be false when the invite expiry is undefined", () => {
+      const user = new User(
+        {
+          id: "304",
+          name: "Guest",
+        },
+        users
+      );
+      expect(user.isInviteExpired).toBe(false);
+    });
+
+    test("should be false when the user has already signed in", () => {
+      const user = new User(
+        {
+          id: "305",
+          name: "Member",
+          lastActiveAt: new Date().toISOString(),
+          inviteExpiresAt: new Date(Date.now() - 86400000).toISOString(),
+        },
+        users
+      );
+      expect(user.isInviteExpired).toBe(false);
+    });
+
+    test("should stay true for a suspended invite, which the resend gate must exclude", () => {
+      const user = new User(
+        {
+          id: "306",
+          name: "Guest",
+          isSuspended: true,
+          inviteExpiresAt: new Date(Date.now() - 86400000).toISOString(),
+        },
+        users
+      );
+      expect(user.isInvited).toBe(true);
+      expect(user.isInviteExpired).toBe(true);
+    });
+  });
 });

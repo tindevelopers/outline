@@ -100,6 +100,8 @@ export default async function userInviter(
               ? UserRole.Viewer
               : UserRole.Member,
         invitedById: user.id,
+        // A suppressed invite sends no email, so it has no lifecycle.
+        inviteLastSentAt: suppressEmail ? null : new Date(),
         flags: suppressEmail
           ? undefined
           : {

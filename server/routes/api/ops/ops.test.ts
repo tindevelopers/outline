@@ -1,4 +1,6 @@
 import { faker } from "@faker-js/faker";
+import { User } from "@server/models";
+import { UserFlag } from "@server/models/User";
 import { buildAdmin, buildUser } from "@server/test/factories";
 import { getTestServer } from "@server/test/support";
 
@@ -61,5 +63,29 @@ describe("#ops.teams.create", () => {
     expect(res.status).toEqual(200);
     expect(body.data.name).toEqual("Acme Corp");
     expect(body.data.subdomain).toEqual(subdomain);
+  });
+
+  it("should start the invite lifecycle for a provisioned first admin", async () => {
+    const platformAdmin = await buildPlatformAdmin();
+    const adminEmail = "First.Admin@Example.com";
+    const subdomain = faker.internet.domainWord();
+
+    const res = await server.post("/api/ops.teams.create", platformAdmin, {
+      body: {
+        name: "Acme Corp",
+        subdomain,
+        adminEmail,
+      },
+    });
+    const body = await res.json();
+    expect(res.status).toEqual(200);
+
+    const admin = await User.findOne({
+      where: { teamId: body.data.id, email: adminEmail.toLowerCase() },
+      rejectOnEmpty: true,
+    });
+    expect(admin.inviteLastSentAt).not.toBeNull();
+    expect(admin.invitedById).toEqual(platformAdmin.id);
+    expect(admin.getFlag(UserFlag.InviteSent)).toEqual(1);
   });
 });

@@ -3,6 +3,7 @@ import type {
   TeamPreferences,
   UserPreferences,
 } from "./types";
+import { Day } from "./utils/time";
 import {
   TOCPosition,
   DocumentPreference,
@@ -12,6 +13,7 @@ import {
   EmailDisplay,
   CommentingAccess,
   NotificationBadgeType,
+  UserRole,
 } from "./types";
 
 export const MAX_AVATAR_DISPLAY = 6;
@@ -112,3 +114,24 @@ export const UserPreferenceDefaults: UserPreferences = {
   [UserPreference.EnableSmartText]: true,
   [UserPreference.NotificationBadge]: NotificationBadgeType.Count,
 };
+
+/**
+ * How long an invitation stays live, and the day offsets on which to remind.
+ * Guests get a short window because the ask is a single page; members get
+ * Slack's documented thirty days.
+ */
+export const InviteLifecycle: Record<
+  UserRole,
+  { windowDays: number; reminderDays: number[] }
+> = {
+  [UserRole.Admin]: { windowDays: 30, reminderDays: [3, 10, 20] },
+  [UserRole.Member]: { windowDays: 30, reminderDays: [3, 10, 20] },
+  [UserRole.Viewer]: { windowDays: 30, reminderDays: [3, 10, 20] },
+  [UserRole.Guest]: { windowDays: 7, reminderDays: [2, 4, 6] },
+};
+
+/** Total manual sends allowed per invite. An abuse backstop, not a policy. */
+export const InviteMaxSends = 10;
+
+/** Minimum time between manual resends of the same invite. */
+export const InviteResendCooldownMs = Day.ms;

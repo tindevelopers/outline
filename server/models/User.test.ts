@@ -4,6 +4,7 @@ import { CollectionPermission, UserRole } from "@shared/types";
 import { createContext } from "@server/context";
 import { Event } from "@server/models";
 import { sequelize } from "@server/storage/database";
+import { getJWTPayload } from "@server/utils/jwt";
 import {
   buildUser,
   buildTeam,
@@ -11,8 +12,9 @@ import {
   buildAdmin,
   buildViewer,
   buildGuestUser,
+  buildInvite,
 } from "@server/test/factories";
-import User from "./User";
+import User, { UserFlag } from "./User";
 import UserMembership from "./UserMembership";
 
 beforeAll(() => {
@@ -468,6 +470,104 @@ describe("user model", () => {
         where: { userId: admin.id, collectionId: collection.id },
       });
       expect(membership?.permission).toEqual(CollectionPermission.ReadWrite);
+    });
+  });
+
+  describe("invite lifecycle", () => {
+    afterEach(() => {
+      vi.setSystemTime(new Date("2018-01-02T00:00:00.000Z"));
+    });
+
+    it("expires a guest invite after seven days", async () => {
+      const user = await buildInvite({
+        role: UserRole.Guest,
+        inviteLastSentAt: new Date("2018-01-01T00:00:00.000Z"),
+      });
+
+      // The suite pins the clock to 2018-01-02, so this is one day old.
+      expect(user.isInviteExpired()).toBe(false);
+
+      vi.setSystemTime(new Date("2018-01-09T00:00:00.000Z"));
+      expect(user.isInviteExpired()).toBe(true);
+    });
+
+    it("keeps a member invite live for thirty days", async () => {
+      const user = await buildInvite({
+        role: UserRole.Member,
+        inviteLastSentAt: new Date("2018-01-01T00:00:00.000Z"),
+      });
+
+      vi.setSystemTime(new Date("2018-01-20T00:00:00.000Z"));
+      expect(user.isInviteExpired()).toBe(false);
+      vi.setSystemTime(new Date("2018-02-05T00:00:00.000Z"));
+      expect(user.isInviteExpired()).toBe(true);
+    });
+
+    it("never expires an invite once it has been accepted", async () => {
+      const user = await buildInvite({
+        role: UserRole.Guest,
+        inviteLastSentAt: new Date("2018-01-01T00:00:00.000Z"),
+      });
+      user.lastActiveAt = new Date("2018-01-03T00:00:00.000Z");
+
+      vi.setSystemTime(new Date("2018-03-01T00:00:00.000Z"));
+      expect(user.isInviteExpired()).toBe(false);
+    });
+
+    it("never expires an invite that was never sent", async () => {
+      const user = await buildInvite({
+        role: UserRole.Guest,
+        inviteLastSentAt: null,
+      });
+
+      vi.setSystemTime(new Date("2019-01-01T00:00:00.000Z"));
+      expect(user.isInviteExpired()).toBe(false);
+    });
+
+    it("signs a guest token that dies with the window, not at thirty days", async () => {
+      const user = await buildInvite({
+        role: UserRole.Guest,
+        inviteLastSentAt: new Date("2018-01-02T00:00:00.000Z"),
+      });
+
+      const payload = getJWTPayload(user.getInviteToken());
+      const expiresAt = new Date((payload.exp as number) * 1000);
+
+      expect(expiresAt.toISOString()).toBe("2018-01-09T00:00:00.000Z");
+    });
+
+    it("keeps the thirty day token for a user with no clock", async () => {
+      const user = await buildInvite({
+        role: UserRole.Member,
+        inviteLastSentAt: null,
+      });
+
+      const payload = getJWTPayload(user.getInviteToken());
+      const expiresAt = new Date((payload.exp as number) * 1000);
+
+      expect(expiresAt.toISOString()).toBe("2018-02-01T00:00:00.000Z");
+    });
+
+    it("restarts the lifecycle, keeping the send count", async () => {
+      const user = await buildInvite({
+        role: UserRole.Guest,
+        inviteLastSentAt: new Date("2018-01-01T00:00:00.000Z"),
+      });
+      user.incrementFlag(UserFlag.InviteReminderSent, 3);
+      user.setFlag(UserFlag.InviteExpiryNotified, true);
+      // Seed a non-zero send count so a reset-to-one regression is caught.
+      user.incrementFlag(UserFlag.InviteSent, 2);
+      const sends = user.getFlag(UserFlag.InviteSent);
+
+      user.restartInviteLifecycle();
+
+      // The suite pins the clock to 2018-01-02.
+      expect(user.inviteLastSentAt).toEqual(
+        new Date("2018-01-02T00:00:00.000Z")
+      );
+      expect(user.getFlag(UserFlag.InviteReminderSent)).toBe(0);
+      expect(user.getFlag(UserFlag.InviteExpiryNotified)).toBe(0);
+      expect(user.getFlag(UserFlag.InviteSent)).toBe(sends + 1);
     });
   });
 });

@@ -20,6 +20,7 @@ import useCurrentUser from "~/hooks/useCurrentUser";
 import useMaxHeight from "~/hooks/useMaxHeight";
 import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
+import Button from "~/components/Button";
 import RemoveGuestDialog from "~/scenes/Settings/components/RemoveGuestDialog";
 import type { Permission } from "~/types";
 import { EmptySelectValue } from "~/types";
@@ -47,13 +48,14 @@ type Props = {
 
 export const AccessControlList = observer(
   ({ collection, share, invitedInSession, visible, loading }: Props) => {
-    const { memberships, groupMemberships, userMemberships, dialogs } =
+    const { memberships, groupMemberships, userMemberships, dialogs, users } =
       useStores();
     const team = useCurrentTeam();
     const can = usePolicy(collection);
     const currentUser = useCurrentUser();
     const { t } = useTranslation();
     const theme = useTheme();
+    const [isResending, setIsResending] = React.useState(false);
     const collectionId = collection.id;
 
     const groupMembershipsInCollection =
@@ -260,9 +262,39 @@ export const AccessControlList = observer(
                         />
                       }
                       title={membership.user.name}
-                      subtitle={membership.user.email}
+                      subtitle={
+                        membership.user.isSuspended
+                          ? t("Suspended")
+                          : membership.user.isInvited
+                            ? membership.user.isInviteExpired
+                              ? t("Invite expired")
+                              : t("Invite pending")
+                            : membership.user.email
+                      }
                       actions={
                         <div style={{ marginRight: -8 }}>
+                          {membership.user.isInvited &&
+                            !membership.user.isSuspended &&
+                            can.inviteGuest && (
+                              <Button
+                                onClick={async () => {
+                                  setIsResending(true);
+                                  try {
+                                    await users.resendInvite(membership.user);
+                                    toast.success(t("Invite resent"));
+                                  } catch (err) {
+                                    toast.error(errToString(err));
+                                  } finally {
+                                    setIsResending(false);
+                                  }
+                                }}
+                                neutral
+                                small
+                                disabled={isResending}
+                              >
+                                {t("Resend")}
+                              </Button>
+                            )}
                           <InputMemberPermissionSelect
                             permissions={permissions}
                             onChange={async (

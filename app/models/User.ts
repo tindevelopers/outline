@@ -94,6 +94,9 @@ class User extends ParanoidModel implements Searchable {
   @observable
   invitedById: string | undefined = undefined;
 
+  @observable
+  inviteExpiresAt: string | null;
+
   /** The user that invited this user, if they were invited. */
   @Relation(() => User)
   invitedBy: User | undefined;
@@ -130,6 +133,17 @@ class User extends ParanoidModel implements Searchable {
    */
   get isInvited(): boolean {
     return !this.lastActiveAt;
+  }
+
+  /**
+   * Whether the invitation has outlived its window without being accepted.
+   */
+  get isInviteExpired(): boolean {
+    return (
+      this.isInvited &&
+      !!this.inviteExpiresAt &&
+      new Date(this.inviteExpiresAt) < new Date(now(60000))
+    );
   }
 
   /**

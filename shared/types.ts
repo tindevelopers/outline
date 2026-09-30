@@ -575,6 +575,7 @@ export enum NotificationEventType {
   Features = "emails.features",
   ExportCompleted = "emails.export_completed",
   RequestDocumentAccess = "access_requests.create",
+  InviteExpired = "emails.invite_expired",
 }
 
 export enum NotificationChannelType {
@@ -585,6 +586,8 @@ export enum NotificationChannelType {
 
 export type NotificationData = {
   emoji?: string;
+  /** Name of the person an invitation expired for. */
+  inviteeName?: string;
 };
 
 export type NotificationSettings = {
@@ -615,6 +618,7 @@ export const NotificationEventDefaults: Record<NotificationEventType, boolean> =
     [NotificationEventType.AddUserToDocument]: true,
     [NotificationEventType.AddUserToCollection]: true,
     [NotificationEventType.RequestDocumentAccess]: true,
+    [NotificationEventType.InviteExpired]: true,
   };
 
 export enum UnfurlResourceType {

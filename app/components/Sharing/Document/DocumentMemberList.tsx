@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import styled, { useTheme } from "styled-components";
 import { s } from "@shared/styles";
 import { DocumentPermission } from "@shared/types";
+import { errToString } from "@shared/utils/error";
 import type Document from "~/models/Document";
 import type User from "~/models/User";
 import type UserMembership from "~/models/UserMembership";
@@ -34,7 +35,7 @@ type Props = {
 };
 
 function DocumentMemberList({ document, invitedInSession }: Props) {
-  const { userMemberships, groupMemberships, memberships, dialogs } =
+  const { userMemberships, groupMemberships, memberships, dialogs, users } =
     useStores();
 
   const user = useCurrentUser();
@@ -247,6 +248,18 @@ function DocumentMemberList({ document, invitedInSession }: Props) {
           user={item}
           membership={item.getMembership(document)}
           onRemove={() => handleRemoveUser(item)}
+          onResend={
+            item.isInvited && can.inviteGuest && !item.isSuspended
+              ? async () => {
+                  try {
+                    await users.resendInvite(item);
+                    toast.success(t("Invite resent"));
+                  } catch (err) {
+                    toast.error(errToString(err));
+                  }
+                }
+              : undefined
+          }
           onUpdate={
             can.manageUsers
               ? (permission) => handleUpdateUser(item, permission)
