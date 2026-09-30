@@ -1241,7 +1241,7 @@ Append to `server/queues/tasks/InviteReminderTask.test.ts`. Scope every email as
     const spy = vi.spyOn(Notification, "create");
 
     await new InviteReminderTask().perform();
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(notifiedFor(spy, guest.name)).toBe(1);
     expect(spy.mock.calls[0][0]).toMatchObject({
       event: NotificationEventType.InviteExpired,
       userId: inviter.id,
@@ -1250,18 +1250,18 @@ Append to `server/queues/tasks/InviteReminderTask.test.ts`. Scope every email as
 
     // A second run must not notify again.
     await new InviteReminderTask().perform();
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(notifiedFor(spy, guest.name)).toBe(1);
 
     spy.mockRestore();
   });
 
   it("does not notify for an invite that is still live", async () => {
-    await buildPendingGuest(50);
+    const guest = await buildPendingGuest(50);
     const spy = vi.spyOn(Notification, "create");
 
     await new InviteReminderTask().perform();
 
-    expect(spy).not.toHaveBeenCalled();
+    expect(notifiedFor(spy, guest.name)).toBe(0);
     spy.mockRestore();
   });
 
@@ -1276,16 +1276,25 @@ Append to `server/queues/tasks/InviteReminderTask.test.ts`. Scope every email as
 
     await new InviteReminderTask().perform();
 
-    expect(spy).not.toHaveBeenCalled();
+    expect(notifiedFor(spy, guest.name)).toBe(0);
     spy.mockRestore();
   });
 ```
 
-Add to that file's imports:
+Add to that file's imports, merging into the existing `@shared/types` and `@server/models` statements rather than adding duplicates:
 
 ```ts
-import { NotificationEventType } from "@shared/types";
+import { CollectionPermission, NotificationEventType, UserRole } from "@shared/types";
 import { Notification, User } from "@server/models";
+```
+
+Add this helper beside `sentTo`, for the same reason: `perform` scans every invited user, so counting all notifications would break against any database holding an unrelated expired invite. Scoping on the invitee's name ties the assertion to this fixture rather than to a derived recipient list.
+
+```ts
+/** Notifications this spy created that name a specific invitee. */
+const notifiedFor = (spy: MockInstance, inviteeName: string) =>
+  spy.mock.calls.filter(([args]) => args.data?.inviteeName === inviteeName)
+    .length;
 ```
 
 `buildInvite` and the `buildPendingGuest` helper are already in the file from Task 4.
@@ -1300,14 +1309,14 @@ Expected: FAIL, `NotificationEventType.InviteExpired` is undefined.
 
 - [ ] **Step 3: Add the event type**
 
-In `shared/types.ts`, add to `NotificationEventType`:
+In `shared/types.ts`, add to `NotificationEventType`. `RequestDocumentAccess` is already the last member today; insert `InviteExpired` after it and leave the existing member untouched:
 
 ```ts
   RequestDocumentAccess = "access_requests.create",
   InviteExpired = "emails.invite_expired",
 ```
 
-and to `NotificationEventDefaults`:
+and to `NotificationEventDefaults`, where `RequestDocumentAccess` is likewise already present:
 
 ```ts
     [NotificationEventType.RequestDocumentAccess]: true,
@@ -1479,12 +1488,12 @@ with:
         }
 ```
 
-Add the imports, merging with the ones already in the file rather than adding duplicate import statements:
+Add the imports, merging with the ones already in the file rather than adding duplicate import statements. `Op`, `subDays`, `UserFlag` and `UserRole` are already imported from Task 4; `NotificationEventType` joins `UserRole` on the `@shared/types` statement, and `Notification` joins `User` on the `@server/models` statement:
 
 ```ts
 import { NotificationEventType, UserRole } from "@shared/types";
 import { Notification, User } from "@server/models";
-import { actorManagesAnyItemOf } from "@server/models/helpers/InviteHelper";
+import { managerIdsFor } from "@server/models/helpers/InviteHelper";
 import type { Transaction } from "sequelize";
 ```
 
