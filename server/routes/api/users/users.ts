@@ -7,9 +7,9 @@ import { settingsPath } from "@shared/utils/routeHelpers";
 import { UserValidation } from "@shared/validations";
 import userInviter from "@server/commands/userInviter";
 import guestInviter from "@server/commands/guestInviter";
+import inviteResender from "@server/commands/inviteResender";
 import ConfirmUpdateEmail from "@server/emails/templates/ConfirmUpdateEmail";
 import ConfirmUserDeleteEmail from "@server/emails/templates/ConfirmUserDeleteEmail";
-import InviteEmail from "@server/emails/templates/InviteEmail";
 import env from "@server/env";
 import { ValidationError } from "@server/errors";
 import logger from "@server/logging/Logger";
@@ -551,37 +551,21 @@ router.post(
 
 router.post(
   "users.resendInvite",
+  rateLimiter(RateLimiterStrategy.TenPerHour),
   auth(),
   validate(T.UsersResendInviteSchema),
   transaction(),
   async (ctx: APIContext<T.UsersResendInviteReq>) => {
     const { id } = ctx.input.body;
-    const { auth, transaction } = ctx.state;
-    const actor = auth.user;
+    const { transaction } = ctx.state;
 
     const user = await User.findByPk(id, {
       lock: transaction.LOCK.UPDATE,
       transaction,
+      rejectOnEmpty: true,
     });
-    authorize(actor, "resendInvite", user);
 
-    if (user.getFlag(UserFlag.InviteSent) > 2) {
-      throw ValidationError("This invite has been sent too many times");
-    }
-
-    await new InviteEmail({
-      to: user.email,
-      language: user.language,
-      name: user.name,
-      actorName: actor.name,
-      actorEmail: actor.email,
-      teamName: actor.team.name,
-      teamUrl: actor.team.url,
-      token: user.getInviteToken(),
-    }).schedule();
-
-    user.incrementFlag(UserFlag.InviteSent);
-    await user.save({ transaction });
+    await inviteResender(ctx, { user });
 
     if (env.isDevelopment) {
       logger.info(
