@@ -67,7 +67,9 @@ describe("invite lifecycle end to end", () => {
     );
     await new InviteReminderTask().perform();
     expect(reminderSpy).toHaveBeenCalledTimes(1);
-    expect(reminderSpy.mock.contexts[0].props.itemName).toBe(collection.name);
+    expect(reminderSpy.mock.contexts[0]).toMatchObject({
+      props: { itemName: collection.name },
+    });
     reminderSpy.mockRestore();
     await guest.reload();
     expect(guest.getFlag(UserFlag.InviteReminderSent)).toBe(1);
@@ -91,15 +93,15 @@ describe("invite lifecycle end to end", () => {
     // The notice reaches the inviter and the manager of the item the guest
     // holds, exactly once each, and names the invitee.
     const expiryCalls = notificationSpy.mock.calls.filter(
-      ([values]) => values.event === NotificationEventType.InviteExpired
+      ([values]) => values?.event === NotificationEventType.InviteExpired
     );
-    const recipients = expiryCalls.map(([values]) => values.userId);
+    const recipients = expiryCalls.map(([values]) => values?.userId);
     expect(new Set(recipients)).toEqual(
       new Set([guest.invitedById, manager.id])
     );
     expect(recipients).toHaveLength(2);
     for (const [values] of expiryCalls) {
-      expect(values.data).toEqual({ inviteeName: guest.name });
+      expect(values?.data).toEqual({ inviteeName: guest.name });
     }
     notificationSpy.mockRestore();
 
@@ -108,7 +110,7 @@ describe("invite lifecycle end to end", () => {
     await new InviteReminderTask().perform();
     expect(
       secondRunSpy.mock.calls.filter(
-        ([values]) => values.event === NotificationEventType.InviteExpired
+        ([values]) => values?.event === NotificationEventType.InviteExpired
       )
     ).toHaveLength(0);
     secondRunSpy.mockRestore();
