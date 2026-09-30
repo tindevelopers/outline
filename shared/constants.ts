@@ -3,7 +3,7 @@ import type {
   TeamPreferences,
   UserPreferences,
 } from "./types";
-import { Hour } from "./utils/time";
+import { Day } from "./utils/time";
 import {
   TOCPosition,
   DocumentPreference,
@@ -134,4 +134,4 @@ export const InviteLifecycle: Record<
 export const InviteMaxSends = 10;
 
 /** Minimum time between manual resends of the same invite. */
-export const InviteResendCooldownMs = Hour.ms;
+export const InviteResendCooldownMs = Day.ms;
