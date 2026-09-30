@@ -14,6 +14,7 @@ import {
   AfterUpdate,
   Length,
   AfterDestroy,
+  BeforeCreate,
   BeforeDestroy,
   BeforeUpdate,
 } from "sequelize-typescript";
@@ -263,6 +264,29 @@ class UserMembership extends IdModel<
           transaction,
         }
       );
+    }
+  }
+
+  @BeforeCreate
+  @BeforeUpdate
+  static async checkGuestPermissionScope(
+    model: UserMembership,
+    options: SaveOptions<UserMembership>
+  ) {
+    if (model.permission !== CollectionPermission.Admin) {
+      return;
+    }
+
+    // The association is not always loaded when creating through a route, so
+    // fall back to a lookup rather than trusting `model.user` to be present.
+    const user =
+      model.user ??
+      (await User.findByPk(model.userId, {
+        transaction: options.transaction,
+      }));
+
+    if (user?.isGuest) {
+      throw ValidationError("Guests cannot be granted manage permissions");
     }
   }
 

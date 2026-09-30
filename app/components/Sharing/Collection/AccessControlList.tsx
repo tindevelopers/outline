@@ -10,14 +10,17 @@ import { s } from "@shared/styles";
 import { CollectionPermission } from "@shared/types";
 import type Collection from "~/models/Collection";
 import type Share from "~/models/Share";
+import type User from "~/models/User";
 import { Avatar, GroupAvatar, AvatarSize } from "~/components/Avatar";
 import InputMemberPermissionSelect from "~/components/InputMemberPermissionSelect";
 import { InputSelectPermission } from "~/components/InputSelectPermission";
 import Scrollable from "~/components/Scrollable";
 import useCurrentTeam from "~/hooks/useCurrentTeam";
+import useCurrentUser from "~/hooks/useCurrentUser";
 import useMaxHeight from "~/hooks/useMaxHeight";
 import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
+import RemoveGuestDialog from "~/scenes/Settings/components/RemoveGuestDialog";
 import type { Permission } from "~/types";
 import { EmptySelectValue } from "~/types";
 import { Separator, GroupMembersPopover } from "../components";
@@ -44,9 +47,11 @@ type Props = {
 
 export const AccessControlList = observer(
   ({ collection, share, invitedInSession, visible, loading }: Props) => {
-    const { memberships, groupMemberships } = useStores();
+    const { memberships, groupMemberships, userMemberships, dialogs } =
+      useStores();
     const team = useCurrentTeam();
     const can = usePolicy(collection);
+    const currentUser = useCurrentUser();
     const { t } = useTranslation();
     const theme = useTheme();
     const collectionId = collection.id;
@@ -94,6 +99,44 @@ export const AccessControlList = observer(
           },
         ] as Permission[],
       [t]
+    );
+
+    /**
+     * Offers to remove a guest account entirely once it no longer holds access
+     * to any collection or document. Only team admins can delete users, so the
+     * prompt is skipped for anyone else.
+     *
+     * Access granted through a group is not considered here; a guest that is a
+     * member of a group keeps their account.
+     */
+    const offerGuestRemoval = React.useCallback(
+      (guest: User) => {
+        if (!guest.isGuest || !currentUser.isAdmin) {
+          return;
+        }
+
+        const stillHasAccess =
+          memberships.orderedData.some((m) => m.userId === guest.id) ||
+          userMemberships.orderedData.some((m) => m.userId === guest.id);
+
+        if (stillHasAccess) {
+          return;
+        }
+
+        dialogs.openModal({
+          title: t("Remove guest"),
+          content: (
+            <RemoveGuestDialog user={guest} onSubmit={dialogs.closeAllModals} />
+          ),
+        });
+      },
+      [
+        currentUser,
+        dialogs,
+        memberships.orderedData,
+        t,
+        userMemberships.orderedData,
+      ]
     );
 
     return (
@@ -233,6 +276,7 @@ export const AccessControlList = observer(
                                     collectionId: collection.id,
                                     userId: membership.userId,
                                   });
+                                  offerGuestRemoval(membership.user);
                                 } else {
                                   await memberships.create({
                                     collectionId: collection.id,

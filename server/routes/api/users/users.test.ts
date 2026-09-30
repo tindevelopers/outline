@@ -1,13 +1,16 @@
 import { faker } from "@faker-js/faker";
-import { TeamPreference, UserRole } from "@shared/types";
+import { CollectionPermission, TeamPreference, UserRole } from "@shared/types";
 import ConfirmUpdateEmail from "@server/emails/templates/ConfirmUpdateEmail";
-import { TeamDomain } from "@server/models";
+import { TeamDomain, UserMembership } from "@server/models";
 import {
   buildTeam,
   buildAdmin,
   buildUser,
   buildInvite,
   buildViewer,
+  buildCollection,
+  buildDocument,
+  buildGuestUser,
 } from "@server/test/factories";
 import { getTestServer } from "@server/test/support";
 
@@ -699,6 +702,22 @@ describe("#users.info", () => {
 });
 
 describe("#users.invite", () => {
+  it("should reject the guest role", async () => {
+    const admin = await buildAdmin();
+    const res = await server.post("/api/users.invite", admin, {
+      body: {
+        invites: [
+          {
+            email: "outsider@example.com",
+            name: "Outsider",
+            role: "guest",
+          },
+        ],
+      },
+    });
+    expect(res.status).toEqual(400);
+  });
+
   it("should return sent invites", async () => {
     const user = await buildAdmin();
     const res = await server.post("/api/users.invite", user, {
@@ -1329,5 +1348,179 @@ describe("#users.activate", () => {
     const body = await res.json();
     expect(res.status).toEqual(403);
     expect(body).toMatchSnapshot();
+  });
+});
+
+describe("#users.inviteGuest", () => {
+  it("should require authentication", async () => {
+    const res = await server.post("/api/users.inviteGuest");
+    expect(res.status).toEqual(401);
+  });
+
+  it("should invite a guest to a collection", async () => {
+    const admin = await buildAdmin();
+    const collection = await buildCollection({
+      teamId: admin.teamId,
+      createdById: admin.id,
+    });
+    const res = await server.post("/api/users.inviteGuest", admin, {
+      body: {
+        email: "outsider@example.com",
+        name: "Outsider",
+        collectionId: collection.id,
+        permission: "read",
+      },
+    });
+    const body = await res.json();
+    expect(res.status).toEqual(200);
+    expect(body.data.user.role).toEqual(UserRole.Guest);
+    expect(body.data.membership.collectionId).toEqual(collection.id);
+    expect(body.data.membership.permission).toEqual("read");
+  });
+
+  it("should invite a guest to a document", async () => {
+    const admin = await buildAdmin();
+    const collection = await buildCollection({
+      teamId: admin.teamId,
+      createdById: admin.id,
+      permission: null,
+    });
+    const document = await buildDocument({
+      teamId: admin.teamId,
+      collectionId: collection.id,
+      createdById: admin.id,
+    });
+    const res = await server.post("/api/users.inviteGuest", admin, {
+      body: {
+        email: "doc-outsider@example.com",
+        documentId: document.id,
+        permission: "read_write",
+      },
+    });
+    const body = await res.json();
+    expect(res.status).toEqual(200);
+    expect(body.data.user.role).toEqual(UserRole.Guest);
+    expect(body.data.membership.documentId).toEqual(document.id);
+  });
+
+  it("should reject the manage permission", async () => {
+    const admin = await buildAdmin();
+    const collection = await buildCollection({
+      teamId: admin.teamId,
+      createdById: admin.id,
+    });
+    const res = await server.post("/api/users.inviteGuest", admin, {
+      body: {
+        email: "outsider@example.com",
+        collectionId: collection.id,
+        permission: "admin",
+      },
+    });
+    expect(res.status).toEqual(400);
+  });
+
+  it("should reject a request with both targets", async () => {
+    const admin = await buildAdmin();
+    const collection = await buildCollection({
+      teamId: admin.teamId,
+      createdById: admin.id,
+    });
+    const document = await buildDocument({
+      teamId: admin.teamId,
+      collectionId: collection.id,
+    });
+    const res = await server.post("/api/users.inviteGuest", admin, {
+      body: {
+        email: "outsider@example.com",
+        collectionId: collection.id,
+        documentId: document.id,
+        permission: "read",
+      },
+    });
+    expect(res.status).toEqual(400);
+  });
+
+  it("should reject a request with no target", async () => {
+    const admin = await buildAdmin();
+    const res = await server.post("/api/users.inviteGuest", admin, {
+      body: {
+        email: "outsider@example.com",
+        permission: "read",
+      },
+    });
+    expect(res.status).toEqual(400);
+  });
+
+  it("should not allow a viewer to invite a guest", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const viewer = await buildViewer({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      createdById: admin.id,
+    });
+    const res = await server.post("/api/users.inviteGuest", viewer, {
+      body: {
+        email: "viewer-outsider@example.com",
+        collectionId: collection.id,
+        permission: "read",
+      },
+    });
+    expect(res.status).toEqual(403);
+  });
+
+  it("should allow a member holding manage on the collection", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const member = await buildUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      createdById: admin.id,
+      permission: null,
+    });
+    await UserMembership.create({
+      createdById: admin.id,
+      collectionId: collection.id,
+      userId: member.id,
+      permission: CollectionPermission.Admin,
+    });
+    const res = await server.post("/api/users.inviteGuest", member, {
+      body: {
+        email: "member-outsider@example.com",
+        collectionId: collection.id,
+        permission: "read",
+      },
+    });
+    const body = await res.json();
+    expect(res.status).toEqual(200);
+    expect(body.data.user.role).toEqual(UserRole.Guest);
+  });
+
+  it("should not allow a guest to invite anyone, even holding manage", async () => {
+    const team = await buildTeam();
+    const guest = await buildGuestUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      createdById: guest.id,
+      permission: null,
+    });
+    // Bypass the guest cap hook to set up the strongest possible guest actor.
+    await UserMembership.create(
+      {
+        createdById: guest.id,
+        collectionId: collection.id,
+        userId: guest.id,
+        permission: CollectionPermission.Admin,
+      },
+      { hooks: false }
+    );
+    const res = await server.post("/api/users.inviteGuest", guest, {
+      body: {
+        email: "guest-outsider@example.com",
+        collectionId: collection.id,
+        permission: "read",
+      },
+    });
+    expect(res.status).toEqual(403);
   });
 });

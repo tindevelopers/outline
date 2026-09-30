@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  CollectionPermission,
   NotificationBadgeType,
   NotificationEventType,
   SidebarSection,
@@ -221,7 +222,10 @@ export const UsersInviteSchema = z.object({
       z.object({
         email: z.email(),
         name: z.string(),
-        role: z.enum(UserRole),
+        role: z.enum(UserRole).refine((role) => role !== UserRole.Guest, {
+          error:
+            "Guests are invited to a specific collection or document with users.inviteGuest",
+        }),
         /** Grants platform admin. Honored only when the inviter is one. */
         platformAdmin: z.boolean().optional(),
       })
@@ -231,3 +235,19 @@ export const UsersInviteSchema = z.object({
 });
 
 export type UsersInviteReq = z.infer<typeof UsersInviteSchema>;
+
+export const UsersInviteGuestSchema = z.object({
+  body: z.object({
+    email: z.email().transform((email) => email.toLowerCase()),
+    name: z.string().optional(),
+    collectionId: z.uuid().optional(),
+    documentId: z.uuid().optional(),
+    /** Guests may be granted view only or edit, never manage. */
+    permission: z.enum([
+      CollectionPermission.Read,
+      CollectionPermission.ReadWrite,
+    ]),
+  }),
+});
+
+export type UsersInviteGuestReq = z.infer<typeof UsersInviteGuestSchema>;

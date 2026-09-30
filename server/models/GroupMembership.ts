@@ -18,11 +18,12 @@ import {
   AfterCreate,
   AfterUpdate,
   AfterDestroy,
+  BeforeCreate,
   BeforeDestroy,
   BeforeUpdate,
 } from "sequelize-typescript";
 import type { DocumentPermission } from "@shared/types";
-import { CollectionPermission } from "@shared/types";
+import { CollectionPermission, UserRole } from "@shared/types";
 import { ValidationError } from "@server/errors";
 import { LockHelper } from "@server/storage/LockHelper";
 import type { APIContext } from "@server/types";
@@ -253,6 +254,35 @@ class GroupMembership extends ParanoidModel<
           transaction,
         }
       );
+    }
+  }
+
+  @BeforeCreate
+  @BeforeUpdate
+  static async checkGuestPermissionScope(
+    model: GroupMembership,
+    options: SaveOptions<GroupMembership>
+  ) {
+    if (model.permission !== CollectionPermission.Admin) {
+      return;
+    }
+
+    const groupUsers = await GroupUser.findAll({
+      where: { groupId: model.groupId },
+      attributes: ["userId"],
+      transaction: options.transaction,
+    });
+
+    const guestCount = await User.count({
+      where: {
+        id: groupUsers.map((groupUser) => groupUser.userId),
+        role: UserRole.Guest,
+      },
+      transaction: options.transaction,
+    });
+
+    if (guestCount > 0) {
+      throw ValidationError("Guests cannot be granted manage permissions");
     }
   }
 

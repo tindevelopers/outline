@@ -5,8 +5,104 @@ import {
   buildTeam,
   buildCollection,
   buildAdmin,
+  buildGuestUser,
 } from "@server/test/factories";
 import { serialize } from "./index";
+
+describe("inviteGuest", () => {
+  it("should allow an admin", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const collection = await buildCollection({ teamId: team.id });
+    const reloaded = await Collection.findByPk(collection.id, {
+      userId: admin.id,
+    });
+    const abilities = serialize(admin, reloaded);
+    expect(abilities.inviteGuest).toBeTruthy();
+  });
+
+  it("should allow a member holding manage on the collection", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const user = await buildUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      permission: null,
+    });
+    await UserMembership.create({
+      createdById: admin.id,
+      collectionId: collection.id,
+      userId: user.id,
+      permission: CollectionPermission.Admin,
+    });
+    const reloaded = await Collection.findByPk(collection.id, {
+      userId: user.id,
+    });
+    const abilities = serialize(user, reloaded);
+    expect(abilities.inviteGuest).toBeTruthy();
+  });
+
+  it("should not allow a member holding only edit", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const user = await buildUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      permission: null,
+    });
+    await UserMembership.create({
+      createdById: admin.id,
+      collectionId: collection.id,
+      userId: user.id,
+      permission: CollectionPermission.ReadWrite,
+    });
+    const reloaded = await Collection.findByPk(collection.id, {
+      userId: user.id,
+    });
+    const abilities = serialize(user, reloaded);
+    expect(abilities.inviteGuest).toEqual(false);
+  });
+
+  it("should not allow a viewer", async () => {
+    const team = await buildTeam();
+    const viewer = await buildUser({
+      teamId: team.id,
+      role: UserRole.Viewer,
+    });
+    const collection = await buildCollection({ teamId: team.id });
+    const reloaded = await Collection.findByPk(collection.id, {
+      userId: viewer.id,
+    });
+    const abilities = serialize(viewer, reloaded);
+    expect(abilities.inviteGuest).toEqual(false);
+  });
+
+  it("should not allow a guest, even with manage on the collection", async () => {
+    const team = await buildTeam();
+    const guest = await buildGuestUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      permission: null,
+    });
+    await UserMembership.create(
+      {
+        createdById: guest.id,
+        collectionId: collection.id,
+        userId: guest.id,
+        permission: CollectionPermission.Admin,
+      },
+      // The guest cap rejects this combination through the model hook; bypass
+      // it to construct the strongest possible guest actor and prove that the
+      // policy still refuses them.
+      { hooks: false }
+    );
+    const reloaded = await Collection.findByPk(collection.id, {
+      userId: guest.id,
+    });
+    const abilities = serialize(guest, reloaded);
+    expect(abilities.inviteGuest).toEqual(false);
+  });
+});
 
 describe("admin", () => {
   it("should allow updating collection but not reading documents", async () => {

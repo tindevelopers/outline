@@ -6,6 +6,7 @@ import { UserRoleHelper } from "@shared/utils/UserRoleHelper";
 import { settingsPath } from "@shared/utils/routeHelpers";
 import { UserValidation } from "@shared/validations";
 import userInviter from "@server/commands/userInviter";
+import guestInviter from "@server/commands/guestInviter";
 import ConfirmUpdateEmail from "@server/emails/templates/ConfirmUpdateEmail";
 import ConfirmUserDeleteEmail from "@server/emails/templates/ConfirmUserDeleteEmail";
 import InviteEmail from "@server/emails/templates/InviteEmail";
@@ -25,7 +26,11 @@ import {
 } from "@server/models/helpers/Filters";
 import { UserFlag } from "@server/models/User";
 import { can, authorize } from "@server/policies";
-import { presentUser, presentPolicies } from "@server/presenters";
+import {
+  presentUser,
+  presentPolicies,
+  presentMembership,
+} from "@server/presenters";
 import type { APIContext } from "@server/types";
 import { RateLimiterStrategy } from "@server/utils/RateLimiter";
 import { safeEqual } from "@server/utils/crypto";
@@ -515,6 +520,31 @@ router.post(
           presentUser(user, { includeEmail: !!can(user, "readEmail", user) })
         ),
       },
+    };
+  }
+);
+
+router.post(
+  "users.inviteGuest",
+  rateLimiter(RateLimiterStrategy.FiftyPerHour),
+  auth(),
+  validate(T.UsersInviteGuestSchema),
+  transaction(),
+  async (ctx: APIContext<T.UsersInviteGuestReq>) => {
+    const { user } = ctx.state.auth;
+    const { email, name, collectionId, documentId, permission } =
+      ctx.input.body;
+
+    const { user: guest, membership } = await guestInviter(ctx, {
+      invite: { email, name, collectionId, documentId, permission },
+    });
+
+    ctx.body = {
+      data: {
+        user: presentUser(guest, { includeEmail: true }),
+        membership: presentMembership(membership),
+      },
+      policies: presentPolicies(user, [guest, membership]),
     };
   }
 );

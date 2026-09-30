@@ -14,7 +14,6 @@ import NudeButton from "~/components/NudeButton";
 import { createAction } from "~/actions";
 import { UserSection } from "~/actions/sections";
 import useBoolean from "~/hooks/useBoolean";
-import useCurrentTeam from "~/hooks/useCurrentTeam";
 import useKeyDown from "~/hooks/useKeyDown";
 import usePolicy from "~/hooks/usePolicy";
 import usePrevious from "~/hooks/usePrevious";
@@ -46,7 +45,6 @@ function SharePopover({
   visible,
   loading: externalLoading,
 }: Props) {
-  const team = useCurrentTeam();
   const { t } = useTranslation();
   const can = usePolicy(document);
   const { shares } = useStores();
@@ -67,6 +65,12 @@ function SharePopover({
   );
 
   const prevPendingIds = usePrevious(pendingIds);
+
+  // An email address in the pending list becomes a guest, who cannot manage.
+  const hasGuestPending = React.useMemo(
+    () => pendingIds.some((id) => isEmail(id)),
+    [pendingIds]
+  );
 
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const suggestionsRef = React.useRef<HTMLDivElement | null>(null);
@@ -146,23 +150,18 @@ function SharePopover({
         perform: async () => {
           const invited = await Promise.all(
             pendingIds.map(async (idOrEmail) => {
-              let user, group;
-
-              // convert email to user
+              // An email address creates or reuses an outside collaborator
+              // scoped to this document, rather than a workspace member.
               if (isEmail(idOrEmail)) {
-                const response = await users.invite([
-                  {
-                    email: idOrEmail,
-                    name: idOrEmail,
-                    role: team.defaultUserRole,
-                  },
-                ]);
-                user = response[0];
-              } else {
-                user = users.get(idOrEmail);
-                group = groups.get(idOrEmail);
+                return users.inviteGuest({
+                  email: idOrEmail,
+                  name: idOrEmail,
+                  documentId: document.id,
+                  permission,
+                });
               }
 
+              const user = users.get(idOrEmail);
               if (user) {
                 await userMemberships.create({
                   documentId: document.id,
@@ -172,6 +171,7 @@ function SharePopover({
                 return user;
               }
 
+              const group = groups.get(idOrEmail);
               if (group) {
                 await groupMemberships.create({
                   documentId: document.id,
@@ -247,7 +247,6 @@ function SharePopover({
       pendingIds,
       permission,
       t,
-      team.defaultUserRole,
       users,
     ]
   );
@@ -309,21 +308,28 @@ function SharePopover({
 
   const permissions = React.useMemo(
     () =>
-      [
-        {
-          label: t("View only"),
-          value: DocumentPermission.Read,
-        },
-        {
-          label: t("Can edit"),
-          value: DocumentPermission.ReadWrite,
-        },
-        {
-          label: t("Manage"),
-          value: DocumentPermission.Admin,
-        },
-      ] as Permission[],
-    [t]
+      (
+        [
+          {
+            label: t("View only"),
+            value: DocumentPermission.Read,
+          },
+          {
+            label: t("Can edit"),
+            value: DocumentPermission.ReadWrite,
+          },
+          {
+            label: t("Manage"),
+            value: DocumentPermission.Admin,
+          },
+        ] as Permission[]
+      ).filter(
+        // A guest can never hold manage, so it is not offered while an email
+        // address is pending.
+        (permission) =>
+          !hasGuestPending || permission.value !== DocumentPermission.Admin
+      ),
+    [t, hasGuestPending]
   );
 
   if (!hasRendered) {

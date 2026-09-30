@@ -68,6 +68,7 @@ export class EventHelper {
     "users.promote",
     "users.demote",
     "users.invite",
+    "users.invite_guest",
     "users.suspend",
     "users.activate",
     "users.delete",

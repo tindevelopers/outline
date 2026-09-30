@@ -2,7 +2,11 @@ import commandScore from "command-score";
 import invariant from "invariant";
 import { deburr, differenceWith, orderBy } from "es-toolkit/compat";
 import { action, computed, makeObservable, override, runInAction } from "mobx";
-import type { UserRole } from "@shared/types";
+import type {
+  CollectionPermission,
+  DocumentPermission,
+  UserRole,
+} from "@shared/types";
 import User from "~/models/User";
 import { client } from "~/utils/ApiClient";
 import type RootStore from "./RootStore";
@@ -115,6 +119,36 @@ export default class UsersStore extends Store<User> {
     client.post(`/users.resendInvite`, {
       id: user.id,
     });
+
+  /**
+   * Invites an outside email address to a single collection or document as a
+   * guest, scoped to that item only rather than to the workspace.
+   *
+   * @param guest the invite to send.
+   * @returns the created or reused user.
+   */
+  @action
+  inviteGuest = async (guest: {
+    email: string;
+    name?: string;
+    collectionId?: string;
+    documentId?: string;
+    permission: CollectionPermission | DocumentPermission;
+  }): Promise<User> => {
+    const res = await client.post(`/users.inviteGuest`, guest);
+    invariant(res?.data, "Data should be available");
+
+    return runInAction(() => {
+      const user = this.add(res.data.user);
+      this.addPolicies(res.policies);
+      if (guest.collectionId) {
+        this.rootStore.memberships.add(res.data.membership);
+      } else {
+        this.rootStore.userMemberships.add(res.data.membership);
+      }
+      return user;
+    });
+  };
 
   /**
    * Returns the loaded user with the given email address, if any.

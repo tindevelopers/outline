@@ -18,6 +18,7 @@ import useStores from "~/hooks/useStores";
 import type { Permission } from "~/types";
 import { EmptySelectValue } from "~/types";
 import { homePath } from "~/utils/routeHelpers";
+import RemoveGuestDialog from "~/scenes/Settings/components/RemoveGuestDialog";
 import { ListItem } from "../components/ListItem";
 import { GroupMembersPopover } from "../components";
 import DocumentMemberListItem from "./DocumentMemberListItem";
@@ -33,13 +34,46 @@ type Props = {
 };
 
 function DocumentMemberList({ document, invitedInSession }: Props) {
-  const { userMemberships, groupMemberships } = useStores();
+  const { userMemberships, groupMemberships, memberships, dialogs } =
+    useStores();
 
   const user = useCurrentUser();
   const history = useHistory();
   const can = usePolicy(document);
   const { t } = useTranslation();
   const theme = useTheme();
+
+  /**
+   * Offers to remove a guest account entirely once it no longer holds access
+   * to any collection or document. Only team admins can delete users, so the
+   * prompt is skipped for anyone else.
+   *
+   * Access granted through a group is not considered here; a guest that is a
+   * member of a group keeps their account.
+   */
+  const offerGuestRemoval = React.useCallback(
+    (guest: User) => {
+      if (!guest.isGuest || !user.isAdmin) {
+        return;
+      }
+
+      const stillHasAccess =
+        memberships.orderedData.some((m) => m.userId === guest.id) ||
+        userMemberships.orderedData.some((m) => m.userId === guest.id);
+
+      if (stillHasAccess) {
+        return;
+      }
+
+      dialogs.openModal({
+        title: t("Remove guest"),
+        content: (
+          <RemoveGuestDialog user={guest} onSubmit={dialogs.closeAllModals} />
+        ),
+      });
+    },
+    [dialogs, memberships.orderedData, t, user, userMemberships.orderedData]
+  );
 
   const handleRemoveUser = React.useCallback(
     async (item: User) => {
@@ -48,6 +82,8 @@ function DocumentMemberList({ document, invitedInSession }: Props) {
           documentId: document.id,
           userId: item.id,
         } as UserMembership);
+
+        offerGuestRemoval(item);
 
         if (item.id === user.id) {
           history.push(homePath());
@@ -62,7 +98,7 @@ function DocumentMemberList({ document, invitedInSession }: Props) {
         toast.error(t("Could not remove user"));
       }
     },
-    [t, history, userMemberships, user, document]
+    [t, history, userMemberships, user, document, offerGuestRemoval]
   );
 
   const handleUpdateUser = React.useCallback(
