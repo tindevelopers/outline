@@ -2602,6 +2602,24 @@ git add server/presenters/user.ts server/presenters/user.test.ts app/models/User
 git commit -m "feat: show pending and expired invites with a resend action"
 ```
 
+### Implementation notes (as built)
+
+Five corrections were needed.
+
+1. **The presenter snapshots change.** Adding `inviteExpiresAt` to the presented object alters both existing `toMatchSnapshot()` outputs in `server/presenters/__snapshots__/user.test.ts.snap`. The file list above omits it; regenerate with `vitest run server/presenters/user.test.ts -u`.
+
+2. **A refused resend was silent, which defeats the point.** The plan's snippets call `void users.resendInvite(user)`, so a 24-hour cooldown refusal, a ceiling refusal, and a guest-with-nothing-to-name refusal all look identical to success — and the discarded promise raises an unhandled rejection. Wrap both call sites in an async handler that awaits the request, shows `toast.success(t("Invite resent"))`, catches with `toast.error(errToString(err))`, and disables the button while in flight. `DocumentMemberList.tsx` needs `errToString` imported from `@shared/utils/error`; the collection dialog already has it. The surrounding dialogs already establish this convention — the permission select beside the button does exactly this.
+
+3. **Suspended users were mislabelled and offered a Resend.** The collection dialog's subtitle tested only `isInvited`/`isInviteExpired` while `DocumentMemberListItem` tested `isSuspended` first, so the two dialogs disagreed about the same user; and the button gate (`isInvited && can.inviteGuest`) let a suspended pending user be re-invited from both dialogs, including the one whose own subtitle said "Suspended". Reachable, because a team admin may suspend any non-self user and suspension sets `suspendedAt` without clearing `lastActiveAt`. Add the `isSuspended` branch ahead of the invite branches, and `!isSuspended` to both button gates.
+
+   Note this also changes the collection dialog for a suspended *non-invited* user, which previously showed their email and now reads "Suspended". That is the intended convergence with the document dialog.
+
+4. **The client getter needs tests, and the presenter field should be required.** `isInviteExpired` is the only client-side decision behind both the subtitle and the button, so cover expired, not-yet-expired, `null`, `undefined`, and not-invited in `app/models/User.test.ts`, which already tests sibling getters. Make `UserPresentation.inviteExpiresAt` required (`Date | null`) rather than optional, matching `lastActiveAt` — it is always assigned, so the optional type only disagrees with the runtime shape. Do not add component tests for the dialogs: there are no `.test.tsx` files in `app/` at all, and one feature is not the place to introduce that pattern.
+
+5. **Use `now(60000)`, not `new Date()`.** The same file already solves time reactivity this way for `lastActiveAt` and `isRecentlyActive`. It keeps the getter plain rather than `@computed`, which the file's own comment explains.
+
+One gap to know about: the suspended-user Resend gate has no automated coverage, because the gate lives in JSX and this repo has no component test harness. The model tests cover the premise (a suspended pending user is still `isInvited`) but not the JSX condition. Verified by reasoning and a temporary-edit experiment, not by a failing test.
+
 ---
 
 ## Task 9: Verify the whole lifecycle
