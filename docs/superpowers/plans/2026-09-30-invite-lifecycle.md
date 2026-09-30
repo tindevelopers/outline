@@ -1487,6 +1487,191 @@ git commit -m "feat: notify whoever can act when an invite expires"
 
 ---
 
+## Task 6b: Restart the lifecycle when an existing guest is invited again
+
+The spec's edge case "the clock is per person, not per grant" says inviting a guest who already holds an item to a second item restarts their window and reminder count. `guestInviter` only sets the clock on the create path, so a reused guest keeps the old clock. Without this, a guest invited to a second item the day before their first window closes receives an expiry notice for an invite they were just sent.
+
+This task comes after Task 6 because the helper it adds touches `UserFlag.InviteExpiryNotified`, which Task 6 defines.
+
+**Files:**
+- Modify: `server/models/User.ts`
+- Modify: `server/commands/guestInviter.ts`
+- Test: `server/models/User.test.ts`, `server/commands/guestInviter.test.ts`
+
+- [ ] **Step 1: Write the failing model test**
+
+Append to the `describe("invite lifecycle")` block in `server/models/User.test.ts`:
+
+```ts
+    it("restarts the lifecycle, keeping the send count", async () => {
+      const user = await buildInvite({
+        role: UserRole.Guest,
+        inviteLastSentAt: new Date("2018-01-01T00:00:00.000Z"),
+      });
+      user.incrementFlag(UserFlag.InviteReminderSent, 3);
+      user.setFlag(UserFlag.InviteExpiryNotified, true);
+      const sends = user.getFlag(UserFlag.InviteSent);
+
+      user.restartInviteLifecycle();
+
+      // The suite pins the clock to 2018-01-02.
+      expect(user.inviteLastSentAt).toEqual(new Date("2018-01-02T00:00:00.000Z"));
+      expect(user.getFlag(UserFlag.InviteReminderSent)).toBe(0);
+      expect(user.getFlag(UserFlag.InviteExpiryNotified)).toBe(0);
+      expect(user.getFlag(UserFlag.InviteSent)).toBe(sends + 1);
+    });
+```
+
+Add `import { UserFlag } from "./User";` if the file does not already import it.
+
+- [ ] **Step 2: Write the failing command test**
+
+Append to `server/commands/guestInviter.test.ts`, following that file's existing `withAPIContext` pattern:
+
+```ts
+  it("restarts the lifecycle when an existing guest is invited again", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const first = await buildCollection({
+      teamId: team.id,
+      createdById: admin.id,
+    });
+
+    const { user: guest } = await withAPIContext(admin, (ctx) =>
+      guestInviter(ctx, {
+        invite: {
+          email: "repeat@example.com",
+          collectionId: first.id,
+          permission: CollectionPermission.Read,
+        },
+      })
+    );
+
+    // Age the invite and pretend the reminders and notice already fired.
+    guest.inviteLastSentAt = subDays(new Date(), 6);
+    guest.incrementFlag(UserFlag.InviteReminderSent, 3);
+    guest.setFlag(UserFlag.InviteExpiryNotified, true);
+    await guest.save();
+
+    const second = await buildCollection({
+      teamId: team.id,
+      createdById: admin.id,
+    });
+
+    const { user: again } = await withAPIContext(admin, (ctx) =>
+      guestInviter(ctx, {
+        invite: {
+          email: "repeat@example.com",
+          collectionId: second.id,
+          permission: CollectionPermission.Read,
+        },
+      })
+    );
+
+    expect(again.getFlag(UserFlag.InviteReminderSent)).toBe(0);
+    expect(again.getFlag(UserFlag.InviteExpiryNotified)).toBe(0);
+    expect(again.isInviteExpired()).toBe(false);
+  });
+
+  it("leaves an existing active member's clock alone", async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const member = await buildUser({ teamId: team.id });
+    const collection = await buildCollection({
+      teamId: team.id,
+      createdById: admin.id,
+    });
+
+    await withAPIContext(admin, (ctx) =>
+      guestInviter(ctx, {
+        invite: {
+          email: member.email,
+          collectionId: collection.id,
+          permission: CollectionPermission.Read,
+        },
+      })
+    );
+
+    await member.reload();
+    expect(member.inviteLastSentAt).toBeNull();
+  });
+```
+
+Add `subDays` from `date-fns` and `UserFlag` from `@server/models/User` to that file's imports if absent.
+
+- [ ] **Step 3: Run the tests to verify they fail**
+
+```bash
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/models/User.test.ts server/commands/guestInviter.test.ts
+```
+Expected: FAIL, `user.restartInviteLifecycle is not a function`.
+
+- [ ] **Step 4: Add the helper to the model**
+
+In `server/models/User.ts`, next to the other invite helpers:
+
+```ts
+  /**
+   * Restarts the invitation lifecycle: reopens the window, resets the reminder
+   * count, and re-arms the expiry notice. The send count is not reset, since it
+   * is an abuse backstop rather than a per-window allowance.
+   */
+  restartInviteLifecycle = () => {
+    this.inviteLastSentAt = new Date();
+    this.setFlag(UserFlag.InviteReminderSent, false);
+    this.setFlag(UserFlag.InviteExpiryNotified, false);
+    this.incrementFlag(UserFlag.InviteSent);
+  };
+```
+
+- [ ] **Step 5: Call it from the reuse path**
+
+In `server/commands/guestInviter.ts`, the existing-user branch currently does nothing. Replace the create-only `if` with:
+
+```ts
+  if (!target) {
+    target = await User.createWithCtx(
+      ctx,
+      {
+        teamId: actor.teamId,
+        name: invite.name?.trim() || email,
+        email,
+        role: UserRole.Guest,
+        invitedById: actor.id,
+        inviteLastSentAt: new Date(),
+        flags: {
+          [UserFlag.InviteSent]: 1,
+        },
+      },
+      { name: "invite_guest" }
+    );
+  } else if (target.isInvited) {
+    // The guest is being emailed again, so their lifecycle restarts. An
+    // existing active member is not invited and has no clock to restart.
+    target.restartInviteLifecycle();
+    await target.saveWithCtx(ctx);
+  }
+```
+
+- [ ] **Step 6: Run the tests to verify they pass**
+
+```bash
+NODE_ENV=test TZ=UTC ./node_modules/.bin/vitest run server/models/User.test.ts server/commands/guestInviter.test.ts server/routes/api/users/users.test.ts
+```
+Expected: PASS.
+
+- [ ] **Step 7: Static checks and commit**
+
+```bash
+./node_modules/.bin/tsc --noEmit
+./node_modules/.bin/oxfmt --check server/models/User.ts server/commands/guestInviter.ts server/models/User.test.ts server/commands/guestInviter.test.ts
+./node_modules/.bin/oxlint --type-aware server/models/User.ts server/commands/guestInviter.ts
+git add server/models/User.ts server/commands/guestInviter.ts server/models/User.test.ts server/commands/guestInviter.test.ts
+git commit -m "feat: restart a guest's invite lifecycle when they are invited again"
+```
+
+---
+
 ## Task 7: Resend with a cooldown, a ceiling, and the right email
 
 **Files:**
@@ -1736,7 +1921,7 @@ export default async function inviteResender(
 
   // Re-anchor before signing, otherwise the new token would inherit the
   // expired window it is replacing.
-  user.inviteLastSentAt = now;
+  user.restartInviteLifecycle();
   const token = user.getInviteToken();
 
   if (user.role === UserRole.Guest) {
@@ -1769,12 +1954,11 @@ export default async function inviteResender(
     }).schedule();
   }
 
-  user.setFlag(UserFlag.InviteExpiryNotified, false);
-  user.setFlag(UserFlag.InviteReminderSent, false);
-  user.incrementFlag(UserFlag.InviteSent);
   await user.save({ transaction });
 }
 ```
+
+`restartInviteLifecycle()` already resets the reminder count, re-arms the expiry notice, and increments the send count, so no separate flag handling is needed here. The `now` variable is still used by the cooldown check above.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -2205,5 +2389,4 @@ git commit -m "fix: address issues found verifying the invite lifecycle"
 - Visitor analytics (sessions, minutes, navigation path).
 - A separate "extend invitation" action. A resend re-anchors the window, which is the same outcome with one button.
 - Configurable windows and cadences. They are constants until a second real value is needed.
-- Per-grant invite clocks. The clock is per person, so inviting a guest to a second item restarts their lifecycle.
 - Group-derived access in the manager lookup and the expiry notice recipients.
