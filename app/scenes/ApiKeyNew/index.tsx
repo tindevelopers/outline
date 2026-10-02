@@ -15,6 +15,8 @@ import useStores from "~/hooks/useStores";
 import useUserLocale from "~/hooks/useUserLocale";
 import { dateToExpiry } from "~/utils/date";
 import ExpiryDatePicker from "./components/ExpiryDatePicker";
+import { ScopePicker } from "./components/ScopePicker";
+import { emptySelection, selectionToScopes } from "./scopes";
 import { ExpiryType, ExpiryValues, calculateExpiryDate } from "./utils";
 
 type Props = {
@@ -23,7 +25,9 @@ type Props = {
 
 function ApiKeyNew({ onSubmit }: Props) {
   const [name, setName] = React.useState("");
-  const [scope, setScope] = React.useState("");
+  const [selection, setSelection] = React.useState(emptySelection);
+  const [advanced, setAdvanced] = React.useState(false);
+  const [rawScope, setRawScope] = React.useState("");
   const [expiryType, setExpiryType] = React.useState<ExpiryType>(
     ExpiryType.Month
   );
@@ -37,8 +41,19 @@ function ApiKeyNew({ onSubmit }: Props) {
   const { t } = useTranslation();
   const userLocale = useUserLocale();
 
+  const scopes = React.useMemo(
+    () =>
+      advanced
+        ? rawScope.split(/[\s,]+/).filter(Boolean)
+        : selectionToScopes(selection),
+    [advanced, rawScope, selection]
+  );
+
   const submitDisabled =
-    isSaving || !name || (!expiresAt && expiryType !== ExpiryType.NoExpiration);
+    isSaving ||
+    !name ||
+    scopes.length === 0 ||
+    (!expiresAt && expiryType !== ExpiryType.NoExpiration);
 
   const expiryOptions = React.useMemo<Option[]>(
     () =>
@@ -57,12 +72,16 @@ function ApiKeyNew({ onSubmit }: Props) {
     []
   );
 
-  const handleScopeChange = React.useCallback(
+  const handleRawScopeChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      setScope(event.target.value);
+      setRawScope(event.target.value);
     },
     []
   );
+
+  const handleToggleAdvanced = React.useCallback(() => {
+    setAdvanced((value) => !value);
+  }, []);
 
   const handleExpiryTypeChange = React.useCallback((value: string) => {
     const expiry = value as ExpiryType;
@@ -83,7 +102,7 @@ function ApiKeyNew({ onSubmit }: Props) {
         await apiKeys.create({
           name,
           expiresAt: expiresAt?.toISOString(),
-          scope: scope ? scope.split(/[\s,]+/).filter(Boolean) : undefined,
+          scope: scopes,
         });
         toast.success(
           t(
@@ -97,7 +116,7 @@ function ApiKeyNew({ onSubmit }: Props) {
         setIsSaving(false);
       }
     },
-    [t, name, scope, expiresAt, onSubmit, apiKeys]
+    [t, name, scopes, expiresAt, onSubmit, apiKeys]
   );
 
   return (
@@ -115,20 +134,34 @@ function ApiKeyNew({ onSubmit }: Props) {
           autoFocus
           flex
         />
-        <Input
-          type="text"
-          label={t("Scopes")}
-          placeholder="documents.info"
-          onChange={handleScopeChange}
-          value={scope}
-          flex
-        />
         <Text type="secondary" size="small" as="p">
-          {t(
-            "Space-separated scopes restrict the access of this API key to specific parts of the API. Leave blank for full access"
-          )}
-          .
+          {t("Choose what this key is allowed to do.")}
         </Text>
+        {advanced ? (
+          <>
+            <Input
+              type="text"
+              label={t("Scopes")}
+              placeholder="documents:read /api/collections.list"
+              onChange={handleRawScopeChange}
+              value={rawScope}
+              flex
+            />
+            <Text type="secondary" size="small" as="p">
+              {t(
+                "Space-separated scopes. Use * for full access. At least one scope is required"
+              )}
+              .
+            </Text>
+          </>
+        ) : (
+          <ScopePicker value={selection} onChange={setSelection} />
+        )}
+        <Flex>
+          <Button type="button" neutral onClick={handleToggleAdvanced}>
+            {advanced ? t("Use the picker") : t("Advanced")}
+          </Button>
+        </Flex>
         <Flex align="center" gap={8}>
           <StyledExpirySelect
             options={expiryOptions}
