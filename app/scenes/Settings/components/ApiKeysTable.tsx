@@ -70,7 +70,7 @@ export const ApiKeysTable = observer(function ApiKeysTable(props: Props) {
         component: (apiKey) => (
           <HStack spacing={4} wrap>
             <Text selectable>{apiKey.name}</Text>
-            {apiKey.scope && (
+            {!apiKey.isFullAccess && apiKey.scope ? (
               <Tooltip
                 content={apiKey.scope.map((s) => (
                   <span key={s}>
@@ -81,6 +81,8 @@ export const ApiKeysTable = observer(function ApiKeysTable(props: Props) {
               >
                 <Badge>{t("Restricted scope")}</Badge>
               </Tooltip>
+            ) : (
+              <Badge>{t("Full access")}</Badge>
             )}
           </HStack>
         ),

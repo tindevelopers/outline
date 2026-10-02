@@ -62,7 +62,7 @@ const ApiKeyListItem = ({ apiKey }: Props) => {
             : t("No expiry")}
         </Text>
       )}
-      {apiKey.scope && (
+      {!apiKey.isFullAccess && apiKey.scope ? (
         <Tooltip
           content={apiKey.scope.map((s) => (
             <span key={s}>
@@ -73,6 +73,8 @@ const ApiKeyListItem = ({ apiKey }: Props) => {
         >
           <Text type="tertiary"> &middot; {t("Restricted scope")}</Text>
         </Tooltip>
+      ) : (
+        <Text type="tertiary"> &middot; {t("Full access")}</Text>
       )}
       {apiKey.hasActiveGracePeriod && (
         <Text type="tertiary">

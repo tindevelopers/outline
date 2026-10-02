@@ -26,7 +26,10 @@ export const APIKeysCreateSchema = BaseSchema.extend({
       .max(ApiKeyValidation.maxNameLength),
     /** API Key expiry date */
     expiresAt: z.coerce.date().optional(),
-    /** A list of scopes that this API key has access to */
+    /**
+     * The scopes this API key has access to. Required: pass `["*"]` to
+     * explicitly grant full access.
+     */
     scope: z
       .array(
         z
@@ -37,7 +40,7 @@ export const APIKeysCreateSchema = BaseSchema.extend({
             error: "Scope must be a valid API scope",
           })
       )
-      .optional(),
+      .min(1, { error: "Choose at least one scope, or use * for full access" }),
   }),
 });
 
