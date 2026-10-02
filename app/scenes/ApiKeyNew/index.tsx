@@ -134,9 +134,9 @@ function ApiKeyNew({ onSubmit }: Props) {
           autoFocus
           flex
         />
-        <Text type="secondary" size="small" as="p">
+        <HelperText type="secondary" size="small" as="p">
           {t("Choose what this key is allowed to do.")}
-        </Text>
+        </HelperText>
         {advanced ? (
           <>
             <Input
@@ -157,11 +157,11 @@ function ApiKeyNew({ onSubmit }: Props) {
         ) : (
           <ScopePicker value={selection} onChange={setSelection} />
         )}
-        <Flex>
+        <AdvancedRow>
           <Button type="button" neutral onClick={handleToggleAdvanced}>
             {advanced ? t("Use the picker") : t("Advanced")}
           </Button>
-        </Flex>
+        </AdvancedRow>
         <Flex align="center" gap={8}>
           <StyledExpirySelect
             options={expiryOptions}
@@ -191,6 +191,15 @@ function ApiKeyNew({ onSubmit }: Props) {
     </form>
   );
 }
+
+const HelperText = styled(Text)`
+  margin-top: 4px;
+  margin-bottom: 12px;
+`;
+
+const AdvancedRow = styled(Flex)`
+  margin: 12px 0 20px;
+`;
 
 const StyledExpirySelect = styled(InputSelect)`
   width: 150px !important;

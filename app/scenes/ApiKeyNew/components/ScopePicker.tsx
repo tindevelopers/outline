@@ -60,7 +60,7 @@ export function ScopePicker({ value, onChange }: Props) {
   );
 
   return (
-    <Flex column gap={8}>
+    <Flex column gap={12}>
       <Flex gap={8} wrap>
         {SCOPE_PRESETS.map((preset) => (
           <Button
@@ -112,6 +112,7 @@ const Rows = styled.div<{ $disabled: boolean }>`
   overflow-y: auto;
   opacity: ${(props) => (props.$disabled ? 0.5 : 1)};
   border-top: 1px solid ${s("divider")};
+  margin-bottom: 4px;
 `;
 
 const Row = styled.div`
@@ -119,7 +120,7 @@ const Row = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 0;
+  padding: 8px 0;
   border-bottom: 1px solid ${s("divider")};
 `;
 
