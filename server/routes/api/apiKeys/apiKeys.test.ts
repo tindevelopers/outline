@@ -20,6 +20,7 @@ describe("#apiKeys.create", () => {
       body: {
         name: "My API Key",
         expiresAt: now.toISOString(),
+        scope: ["read"],
       },
     });
     const body = await res.json();
@@ -36,6 +37,7 @@ describe("#apiKeys.create", () => {
     const res = await server.post("/api/apiKeys.create", user, {
       body: {
         name: "My API Key",
+        scope: ["read"],
       },
     });
     const body = await res.json();
@@ -59,6 +61,33 @@ describe("#apiKeys.create", () => {
 
     expect(res.status).toEqual(200);
     expect(body.data.scope).toEqual(["*"]);
+  });
+
+  it("should reject a missing scope", async () => {
+    const user = await buildUser();
+
+    const res = await server.post("/api/apiKeys.create", user, {
+      body: {
+        name: "My API Key",
+      },
+    });
+
+    expect(res.status).toEqual(400);
+  });
+
+  it("should reject an empty scope list", async () => {
+    const user = await buildUser();
+
+    const res = await server.post("/api/apiKeys.create", user, {
+      body: {
+        name: "My API Key",
+        scope: [],
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(400);
+    expect(body.message).toContain("Choose at least one scope");
   });
 
   it("should reject malformed scopes", async () => {
@@ -114,6 +143,7 @@ describe("#apiKeys.create", () => {
     const res = await server.post("/api/apiKeys.create", viewer, {
       body: {
         name: "My API Key",
+        scope: ["read"],
       },
     });
     const body = await res.json();
@@ -128,6 +158,7 @@ describe("#apiKeys.create", () => {
     const res = await server.post("/api/apiKeys.create", guest, {
       body: {
         name: "My API Key",
+        scope: ["read"],
       },
     });
 
