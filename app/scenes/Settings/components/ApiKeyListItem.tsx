@@ -62,7 +62,7 @@ const ApiKeyListItem = ({ apiKey }: Props) => {
             : t("No expiry")}
         </Text>
       )}
-      {apiKey.scope ? (
+      {!apiKey.isFullAccess && apiKey.scope ? (
         <Tooltip
           content={apiKey.scope.map((s) => (
             <span key={s}>

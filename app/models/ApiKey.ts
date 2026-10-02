@@ -19,7 +19,7 @@ class ApiKey extends Model implements Searchable {
   @observable
   name: string;
 
-  /** A list of scopes that this API key has access to. If empty, the key has full access. */
+  /** A list of scopes that this API key has access to. Null or undefined means full access; an empty list means no access. */
   @Field
   @observable
   scope?: string[] = undefined;
@@ -50,6 +50,12 @@ class ApiKey extends Model implements Searchable {
   @computed
   get isExpired() {
     return this.expiresAt ? isPast(new Date(this.expiresAt)) : false;
+  }
+
+  /** Whether the API key has full access: no scope set, or the wildcard scope. */
+  @computed
+  get isFullAccess() {
+    return !this.scope || this.scope.includes("*");
   }
 
   /** Whether a previously replaced secret is still within its grace period. */

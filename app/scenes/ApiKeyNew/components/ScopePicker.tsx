@@ -80,7 +80,7 @@ export function ScopePicker({ value, onChange }: Props) {
           )}
         </Text>
       )}
-      <Rows $disabled={value.full} aria-disabled={value.full}>
+      <Rows $disabled={value.full}>
         {ACCESS_AREAS.map((area) => (
           <Row key={area.id}>
             <Flex column>
@@ -97,7 +97,7 @@ export function ScopePicker({ value, onChange }: Props) {
               short
               disabled={value.full}
               options={levelOptions(area.canCreate)}
-              value={value.full ? "none" : (value.levels[area.id] ?? "none")}
+              value={value.full ? "write" : (value.levels[area.id] ?? "none")}
               onChange={(level) => handleLevelChange(area.id, level)}
             />
           </Row>

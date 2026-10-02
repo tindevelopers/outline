@@ -15,6 +15,15 @@ describe("selectionToScopes", () => {
     expect(selectionToScopes({ full: true, levels: {} })).toEqual(["*"]);
   });
 
+  it("ignores levels for areas that are not in the catalog", () => {
+    expect(
+      selectionToScopes({
+        full: false,
+        levels: { users: "write", apiKeys: "write", teams: "write" },
+      })
+    ).toEqual([]);
+  });
+
   it("ignores the area levels when full access is on", () => {
     const selection = emptySelection();
     selection.full = true;
